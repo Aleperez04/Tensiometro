@@ -27,3 +27,7 @@ test_color.py
 Baumanometro/Baumanometro/dataset/
 *.mat
 *.zip
+
+# Scripts de automatizacion locales
+push.bat
+push_to_github.bat
