@@ -1,6 +1,6 @@
 /*
   ===================================================================================
-  ESTACIÓN MÉDICA DE DIAGNÓSTICO CARDIOVASCULAR - VERSIÓN 2.0
+  ESTACIÓN MÉDICA DE DIAGNÓSTICO CARDIOVASCULAR
   Proyecto: Tensiómetro Digital de Arteria Radial con Compensación y Cancelación NLMS
   Plataforma: ESP32 Mini (Operación Autónoma a Batería Li-Po 3.7V con TP4056 USB-C)
   Sensores: MAX30102 (PPG Óptico) + MPU6050 (Acelerómetro Triaxial) en Bus I2C (400kHz)
@@ -148,22 +148,22 @@ void checkBatteryStatus() {
 // -----------------------------------------------------------------------------
 // CALLBACKS DEL SERVIDOR BLE (RECONEXIÓN AUTOMÁTICA Y COMANDOS)
 // -----------------------------------------------------------------------------
-class ServerCallbacksV2: public BLEServerCallbacks {
+class ServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
         deviceConnected = true;
-        Serial.println("[BLE v2] Enlace establecido con cliente receptor.");
+        Serial.println("[BLE] Enlace establecido con cliente receptor.");
     }
     void onDisconnect(BLEServer* pServer) {
         deviceConnected = false;
         streamingActive = false;
         packetSequence = 0;
         bufferIndex = 0;
-        Serial.println("[BLE v2] Enlace interrumpido. Reanudando transmisiones de anuncio...");
+        Serial.println("[BLE] Enlace interrumpido. Reanudando transmisiones de anuncio...");
         pServer->startAdvertising(); // Reconexión automática
     }
 };
 
-class ControlCallbacksV2: public BLECharacteristicCallbacks {
+class ControlCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
         String rxValue = pCharacteristic->getValue().c_str(); 
         if (rxValue.length() > 0) {
@@ -172,10 +172,10 @@ class ControlCallbacksV2: public BLECharacteristicCallbacks {
                 packetSequence = 0;
                 bufferIndex = 0;
                 particleSensor.clearFIFO();
-                Serial.println("[BLE v2] Comando START recibido. Telemetría de 20 bytes iniciada.");
+                Serial.println("[BLE] Comando START recibido. Telemetría de 20 bytes iniciada.");
             } else if (rxValue == "STOP") {
                 streamingActive = false;
-                Serial.println("[BLE v2] Comando STOP recibido. Adquisición pausada.");
+                Serial.println("[BLE] Comando STOP recibido. Adquisición pausada.");
             }
         }
     }
@@ -190,7 +190,7 @@ void setup() {
     pinMode(BATTERY_ADC_PIN, INPUT);
 
     Serial.println("\n=======================================================");
-    Serial.println("  ESTACIÓN MÉDICA CARDIOVASCULAR v2.0 - ESP32 MINI");
+    Serial.println("  ESTACIÓN MÉDICA CARDIOVASCULAR - ESP32 MINI");
     Serial.println("  Telemetría PPG (MAX30102) + Aceleración Triaxial (MPU6050)");
     Serial.println("=======================================================");
 
@@ -224,9 +224,9 @@ void setup() {
     Serial.println("[OK] MAX30102 configurado a 100 Hz y 18 bits.");
 
     // 4. Inicialización del Stack BLE GATT
-    BLEDevice::init("Tensiometro_Pulsera_v2");
+    BLEDevice::init("Tensiometro_Pulsera");
     pServer = BLEDevice::createServer();
-    pServer->setCallbacks(new ServerCallbacksV2());
+    pServer->setCallbacks(new ServerCallbacks());
 
     BLEService *pService = pServer->createService(SERVICE_UUID);
 
@@ -242,7 +242,7 @@ void setup() {
         CONTROL_UUID,
         BLECharacteristic::PROPERTY_WRITE
     );
-    pControlChar->setCallbacks(new ControlCallbacksV2());
+    pControlChar->setCallbacks(new ControlCallbacks());
 
     // Característica de telemetría de batería (mV, %, flags)
     pBatteryChar = pService->createCharacteristic(

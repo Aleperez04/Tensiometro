@@ -1,6 +1,6 @@
 """
 ===================================================================================
-ESTACIÓN MÉDICA DE DIAGNÓSTICO CARDIOVASCULAR - VERSIÓN 2.0
+ESTACIÓN MÉDICA DE DIAGNÓSTICO CARDIOVASCULAR
 Tensiómetro Digital de Arteria Radial con Cancelación de Movimiento (NLMS),
 Monitoreo de Batería, Calibración Clínica Individual y Tono de Piel Automático
 ===================================================================================
@@ -267,7 +267,7 @@ class BLEWorker(QThread):
                     ay_g = ay_raw / 16384.0
                     az_g = az_raw / 16384.0
                 else:
-                    ax_g, ay_g, az_g = 0.0, 0.0, 1.0 # Nominal 1g en reposo para v1
+                    ax_g, ay_g, az_g = 0.0, 0.0, 1.0 # Nominal 1g en reposo por defecto
                     
                 self.data_received.emit(red_samples, ir_samples, packet_seq, [ax_g, ay_g, az_g])
             else:
@@ -359,13 +359,13 @@ class ClinicalCalibrationDialog(QDialog):
         return self.txt_id.text().strip(), sbp_avg, dbp_avg
 
 # =============================================================================
-# 5. VENTANA PRINCIPAL (ESTACIÓN CLÍNICA HUD v2.0)
+# 5. VENTANA PRINCIPAL (ESTACIÓN CLÍNICA HUD)
 # =============================================================================
 class MainWindow(QMainWindow):
     """Interfaz gráfica HUD institucional con filtrado adaptativo NLMS y monitoreo de batería."""
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("ESTACIÓN DE MONITOREO CARDIACO - GOBIERNO DE MÉXICO (v2.0)")
+        self.setWindowTitle("ESTACIÓN DE MONITOREO CARDIACO - GOBIERNO DE MÉXICO")
         self.resize(1450, 930)
         self.ble_worker = None
         self.is_connected = False
@@ -591,7 +591,7 @@ class MainWindow(QMainWindow):
         
         lbl_logo = QLabel("🇲🇽 GOBIERNO DE MÉXICO")
         lbl_logo.setFont(QFont("Arial", 11, QFont.Weight.Bold))
-        lbl_title = QLabel("|   ESTACIÓN DE DIAGNÓSTICO CARDIOVASCULAR v2.0")
+        lbl_title = QLabel("|   ESTACIÓN DE DIAGNÓSTICO CARDIOVASCULAR")
         lbl_title.setFont(QFont("Arial", 10))
         lbl_title.setStyleSheet("color: #D4C19C;")
         
@@ -1550,7 +1550,7 @@ class MainWindow(QMainWindow):
                 
                 # Bloque superior con banderas de configuración algorítmica
                 writer.writerow(["# ====================================================================="])
-                writer.writerow(["# REPORTE DE VALIDACIÓN CLÍNICA - TENSIÓMETRO DIGITAL v2.0 (ARCADIA)"])
+                writer.writerow(["# REPORTE DE VALIDACIÓN CLÍNICA - TENSIÓMETRO DIGITAL"])
                 writer.writerow([f"# ID_Sujeto: {self.subject_id}", f"Fecha: {time.strftime('%Y-%m-%d %H:%M:%S')}"])
                 writer.writerow([f"# SBP_Referencia_Esfigmomanómetro: {self.sbp_reference:.1f} mmHg", 
                                  f"DBP_Referencia_Esfigmomanómetro: {self.dbp_reference:.1f} mmHg"])
