@@ -1,34 +1,50 @@
-# Compilaciones y ejecutables
+# =========================================================
+# CONFIGURACIÓN DE EXCLUSIONES PARA EL REPOSITORIO GIT
+# =========================================================
+
+# Compilaciones y ejecutables locales
 build/
 dist/
 *.spec
+*.exe
 tensiometro_reconstructed.exe
 tensiometro-final (1).exe
 
-# Carpetas de extraccion/descompresion
+# Carpetas de extracción y descompresión
 *_extracted/
 *.exe_extracted/
-tensiometro-final (1).exe_extracted/
 
-# Python cache
+# Cache de Python y checkpoints
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints/
-
-# Scripts temporales de prueba y backups
-test_filter.py
-test_color.py
+*.ipynb_checkpoints/
 *_backup.py
 
-# DATASETS PESADOS (Ignorados para evitar que GitHub rechace el push por limite de 100MB)
-Baumanometro/Baumanometro/dataset/
+# Aplicación Web (excluida para dejar solo la app de escritorio)
+landing/
+
+# Formatos de texto intermedios (solo se conservan los PDF en el repositorio)
+*.docx
+*.md
+convert_*.py
+generate_*.py
+docs_img/
+
+# Scripts de utilidad local y notebooks de investigación
+color.ipynb
+extract.py
+pyinstxtractor.py
+test_*.py
+
+# Versiones de prueba y datasets masivos (>100MB)
+firmware_v1/
+firmware_v2/
+Baumanometro/
 *.mat
 *.zip
 
-# Scripts de automatizacion locales
+# Scripts de automatización locales
 push.bat
 push_to_github.bat
