@@ -1,8 +1,12 @@
-// Lógica de interacción y Web Bluetooth para la Landing Page de la Estación Médica
+// ===================================================================================
+// ESTACIÓN MÉDICA DE DIAGNÓSTICO CARDIOVASCULAR - VERSIÓN 2.0 (WEB BLUETOOTH)
+// Cancelación de Movimiento Adaptativa (NLMS), Monitoreo de Batería,
+// Calibración Clínica Individual y Tono de Piel Automático por DCraw
+// ===================================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------
-    // 1. Lógica del Botón Copiar Código Arduino (Existente)
+    // 1. Botón Copiar Código Arduino (v2.0)
     // ---------------------------------------------------------
     const copyBtn = document.getElementById('copyBtn');
     const arduinoCode = document.getElementById('arduinoCode');
@@ -19,36 +23,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     copyBtn.classList.remove('copied');
                 }, 2500);
             } catch (err) {
-                console.error('Error al copiar el código al portapapeles: ', err);
-                const textArea = document.createElement('textarea');
-                textArea.value = codeText;
-                textArea.style.position = 'fixed';
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                try {
-                    const successful = document.execCommand('copy');
-                    if (successful) {
-                        copyBtn.textContent = '✓ ¡Copiado!';
-                        copyBtn.classList.add('copied');
-                        setTimeout(() => {
-                            copyBtn.textContent = '📋 Copiar Código';
-                            copyBtn.classList.remove('copied');
-                        }, 2500);
-                    } else {
-                        copyBtn.textContent = '❌ Error al copiar';
-                    }
-                } catch (fallbackErr) {
-                    console.error('Fallback fallido:', fallbackErr);
-                    copyBtn.textContent = '❌ No soportado';
-                }
-                document.body.removeChild(textArea);
+                console.error('Error al copiar el código: ', err);
             }
         });
     }
 
     // ---------------------------------------------------------
-    // 2. Control Spy en Barra de Navegación (Existente)
+    // 2. Control Spy en Barra de Navegación
     // ---------------------------------------------------------
     const sections = document.querySelectorAll('section');
     const navLinks = document.querySelectorAll('.nav-links a');
@@ -76,20 +57,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. Constantes de Bluetooth y Algoritmos
     // ---------------------------------------------------------
     const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-    const DATA_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"; // Notificaciones
-    const CONTROL_CHAR_UUID = "12345678-1234-1234-1234-123456789abc"; // Control START/STOP
+    const DATA_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";        // 20 o 14 bytes
+    const CONTROL_CHAR_UUID = "12345678-1234-1234-1234-123456789abc";     // START / STOP
+    const BATTERY_CHAR_UUID = "00002a19-0000-1000-8000-00805f9b34fb";     // Batería (mV, %, flags)
     const EXPECTED_FREQ = 100.0;
-    const BUFFER_LIMIT = 500; // Mantener últimos 5 segundos de datos
+    const BUFFER_LIMIT = 500;
 
     // ---------------------------------------------------------
-    // 4. Elementos del DOM del Monitor
+    // 4. Elementos del DOM del Monitor Clínico
     // ---------------------------------------------------------
     const connectBleBtn = document.getElementById('connectBleBtn');
     const disconnectBleBtn = document.getElementById('disconnectBleBtn');
     const startStudyBtn = document.getElementById('startStudyBtn');
     const exportCsvBtn = document.getElementById('exportCsvBtn');
+    const calibModalBtn = document.getElementById('calibModalBtn');
+    
     const connectionStatus = document.getElementById('connectionStatus');
+    const batteryStatus = document.getElementById('batteryStatus');
     const skinContact = document.getElementById('skinContact');
+    const motionStatus = document.getElementById('motionStatus');
+    const alertBanner = document.getElementById('alertBanner');
+    
     const deviceSampling = document.getElementById('deviceSampling');
     const packetLoss = document.getElementById('packetLoss');
     const samplesCollected = document.getElementById('samplesCollected');
@@ -97,24 +85,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressBarContainer = document.getElementById('progressBarContainer');
     const progressBar = document.getElementById('progressBar');
     
-    // Checkboxes del canvas
     const invertSignal = document.getElementById('invertSignal');
     const filterSignal = document.getElementById('filterSignal');
+    const nlmsSignal = document.getElementById('nlmsSignal');
     
-    // Displays de variables clínicas en las tarjetas
     const bpmValue = document.getElementById('bpmValue');
     const bpValue = document.getElementById('bpValue');
     const spo2Value = document.getElementById('spo2Value');
     const bpmCardIcon = document.querySelector('.vital-card .bpm');
 
-    // Canvas del Osciloscopio
     const canvas = document.getElementById('ppgCanvas');
     const ctx = canvas.getContext('2d');
 
-    // Calibración de Piel
     const skinToneSelect = document.getElementById('skinToneSelect');
+    const autoSkinCheckbox = document.getElementById('autoSkinCheckbox');
     const skinPhotoBtn = document.getElementById('skinPhotoBtn');
     const skinPhotoUpload = document.getElementById('skinPhotoUpload');
+
+    // Modal de Calibración
+    const calibModal = document.getElementById('calibModal');
+    const saveCalibBtn = document.getElementById('saveCalibBtn');
+    const closeCalibBtn = document.getElementById('closeCalibBtn');
+    const calibSubjectId = document.getElementById('calibSubjectId');
+    const calibS1 = document.getElementById('calibS1');
+    const calibD1 = document.getElementById('calibD1');
+    const calibS2 = document.getElementById('calibS2');
+    const calibD2 = document.getElementById('calibD2');
+    const calibS3 = document.getElementById('calibS3');
+    const calibD3 = document.getElementById('calibD3');
 
     const skinCalibrationData = [
         { name: "Muy clara", spo2Offset: 0.0, sbpOffset: 0.0, dbpOffset: 0.0 },
@@ -126,40 +124,76 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     // ---------------------------------------------------------
-    // 5. Variables de Estado de la Sesión
+    // 5. Variables de Estado de la Sesión y Algoritmia
     // ---------------------------------------------------------
     let bleDevice = null;
     let bleServer = null;
     let bleService = null;
     let dataChar = null;
     let controlChar = null;
+    let batteryChar = null;
     
     let isConnected = false;
     let isPreviewing = false;
     let isRecording = false;
+
+    // Batería con Histéresis
+    let batteryPct = 100;
+    let batteryMv = 4200;
+    let batteryLow = false;
+
+    // Aceleración y Máquina de Estados
+    let currentMotionState = "REPOSO";
+    let lastValidSbp = null;
+    let lastValidDbp = null;
+
+    // Calibración Clínica Individual
+    let subjectId = "SUJETO-01";
+    let sbpReference = 120.0;
+    let dbpReference = 80.0;
+    let isClinicallyCalibrated = false;
+    let calibSbpOffset = 0.0;
+    let calibDbpOffset = 0.0;
+
+    // Tono automático por DCraw
+    let dcRedAvg = 100000.0;
+    let dcIrAvg = 100000.0;
+    let stableContactCount = 0;
 
     // Búferes de datos de la sesión
     let rawRedBuffer = [];
     let rawIrBuffer = [];
     let filteredRedBuffer = [];
     let filteredIrBuffer = [];
+    let nlmsRedBuffer = [];
+    let nlmsIrBuffer = [];
+    let accelMagBuffer = [];
     let timeBuffer = [];
 
-    // Búferes especiales de grabación
-    let recordingTime = [];
-    let recordingRawRed = [];
-    let recordingRawIr = [];
-    let recordingFilteredRed = [];
-    let recordingFilteredIr = [];
+    // Búferes para exportación CSV (N=30)
+    let recTime = [];
+    let recRawRed = [];
+    let recRawIr = [];
+    let recFiltRed = [];
+    let recFiltIr = [];
+    let recNlmsRed = [];
+    let recNlmsIr = [];
+    let recAccelX = [];
+    let recAccelY = [];
+    let recAccelZ = [];
+    let recAccelMag = [];
+    let recMotion = [];
+    let recBat = [];
+    let recBpm = [];
+    let recSpo2 = [];
+    let recSbp = [];
+    let recDbp = [];
     let recordingStartTime = 0;
 
     // Métricas de paquetes
     let expectedPacketSeq = 0;
     let receivedPackets = 0;
     let lostPackets = 0;
-    let duplicatePackets = 0;
-    
-    // Mediciones de frecuencia y tiempos
     let globalSampleIndex = 0;
     let startTime = null;
     let actualFreq = EXPECTED_FREQ;
@@ -167,11 +201,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastFreqSamples = 0;
 
     // ---------------------------------------------------------
-    // 6. Clase Filtro Butterworth (Real-Time IIR Bandpass 0.5 - 8.0 Hz)
+    // 6. Filtro Digital IIR Butterworth (0.5 - 8.0 Hz SOS)
     // ---------------------------------------------------------
     class ButterworthFilter {
         constructor() {
-            // Coeficientes SOS para fs=100Hz, f_low=0.5Hz, f_high=8.0Hz
             this.sos = [
                 [1.78260999e-03, 3.56521998e-03, 1.78260999e-03, -1.29176642e+00, 4.35717576e-01],
                 [1.00000000e+00, 2.00000000e+00, 1.00000000e+00, -1.51260719e+00, 7.19524086e-01],
@@ -182,12 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         reset() {
-            this.states = [
-                [0.0, 0.0],
-                [0.0, 0.0],
-                [0.0, 0.0],
-                [0.0, 0.0]
-            ];
+            this.states = [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]];
         }
 
         filter(x) {
@@ -208,46 +236,80 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ---------------------------------------------------------
+    // 7. Filtro Adaptativo NLMS (Cancelación de Ruido en JavaScript)
+    // ---------------------------------------------------------
+    class NLMSFilter {
+        constructor(numTaps = 24, mu = 0.02, epsilon = 1e-5) {
+            this.numTaps = numTaps;
+            this.mu = mu;
+            this.epsilon = epsilon;
+            this.reset();
+        }
+
+        reset() {
+            this.weights = new Float32Array(this.numTaps);
+            this.buffer = new Float32Array(this.numTaps);
+        }
+
+        filter(desired, noiseRef, adapt = true) {
+            // Desplazar buffer de ruido
+            for (let i = this.numTaps - 1; i > 0; i--) {
+                this.buffer[i] = this.buffer[i - 1];
+            }
+            this.buffer[0] = noiseRef;
+
+            // Estimación del ruido acoplado
+            let noiseEst = 0;
+            for (let i = 0; i < this.numTaps; i++) {
+                noiseEst += this.weights[i] * this.buffer[i];
+            }
+            const cleanSignal = desired - noiseEst;
+
+            // Actualización de pesos adaptativos
+            if (adapt) {
+                let power = 0;
+                for (let i = 0; i < this.numTaps; i++) {
+                    power += this.buffer[i] * this.buffer[i];
+                }
+                power += this.epsilon;
+                const step = (this.mu / power) * cleanSignal;
+                for (let i = 0; i < this.numTaps; i++) {
+                    this.weights[i] += step * this.buffer[i];
+                }
+            }
+            return cleanSignal;
+        }
+    }
+
     const butterFilterRed = new ButterworthFilter();
     const butterFilterIr = new ButterworthFilter();
+    const butterFilterAccel = new ButterworthFilter();
+    const nlmsFilterRed = new NLMSFilter(24, 0.02);
+    const nlmsFilterIr = new NLMSFilter(24, 0.02);
 
     // ---------------------------------------------------------
-    // 7. Configuración del Canvas (Osciloscopio)
+    // 8. Renderizado del Canvas (Osciloscopio a 60 FPS)
     // ---------------------------------------------------------
     function drawGrid() {
         ctx.strokeStyle = 'rgba(22, 29, 26, 0.5)';
         ctx.lineWidth = 1;
-        
-        // Dibujar líneas verticales
         for (let x = 0; x < canvas.width; x += 40) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, canvas.height);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
         }
-        
-        // Dibujar líneas horizontales
         for (let y = 0; y < canvas.height; y += 40) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(canvas.width, y);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
         }
     }
 
     function renderPlot() {
-        // Limpiar el canvas
         ctx.fillStyle = '#060907';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Dibujar cuadrícula médica fluorescente
         drawGrid();
 
         if (!isPreviewing || timeBuffer.length === 0) {
-            // Si está desconectado, dibujar línea plana de estado de espera
             ctx.strokeStyle = '#555555';
             ctx.lineWidth = 2;
-            ctx.shadowBlur = 0;
             ctx.beginPath();
             ctx.moveTo(0, canvas.height / 2);
             ctx.lineTo(canvas.width, canvas.height / 2);
@@ -255,73 +317,61 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Obtener búfer a dibujar (IR filtrado o crudo)
-        const isFilterEnabled = filterSignal.checked;
-        const sourceBuffer = isFilterEnabled ? filteredIrBuffer : rawIrBuffer;
-        
-        if (sourceBuffer.length < 2) return;
+        // Selección de canal a renderizar
+        let displayBuffer = nlmsSignal.checked ? nlmsIrBuffer : (filterSignal.checked ? filteredIrBuffer : rawIrBuffer);
+        if (displayBuffer.length === 0) return;
 
-        // Calcular mínimos y máximos para el escalado dinámico
-        let yMin = sourceBuffer[0];
-        let yMax = sourceBuffer[0];
-        for (let i = 1; i < sourceBuffer.length; i++) {
-            if (sourceBuffer[i] < yMin) yMin = sourceBuffer[i];
-            if (sourceBuffer[i] > yMax) yMax = sourceBuffer[i];
+        const tMax = timeBuffer[timeBuffer.length - 1];
+        const tMin = Math.max(0, tMax - 5);
+        const activeIndices = [];
+        for (let i = 0; i < timeBuffer.length; i++) {
+            if (timeBuffer[i] >= tMin && timeBuffer[i] <= tMax) {
+                activeIndices.push(i);
+            }
         }
-        let yRange = yMax - yMin;
-        if (yRange < 1.0) yRange = 1.0;
+        if (activeIndices.length === 0) return;
 
-        // Inversión visual de la señal si está seleccionado
-        const isInvert = invertSignal.checked;
+        let yMin = Infinity, yMax = -Infinity;
+        for (let idx of activeIndices) {
+            const v = displayBuffer[idx];
+            if (v < yMin) yMin = v;
+            if (v > yMax) yMax = v;
+        }
+        const margin = (yMax - yMin) * 0.1 || 10;
+        const scaleMin = yMin - margin;
+        const scaleMax = yMax + margin;
 
-        // Trazado de la onda
-        ctx.strokeStyle = '#88C0A0'; // Verde brillante osciloscopio
+        ctx.strokeStyle = nlmsSignal.checked ? '#00FFCC' : '#FF3366';
         ctx.lineWidth = 2.5;
-        ctx.shadowColor = '#88C0A0';
+        ctx.shadowColor = ctx.strokeStyle;
         ctx.shadowBlur = 8;
         ctx.beginPath();
 
-        const stepX = canvas.width / BUFFER_LIMIT;
-        
-        for (let i = 0; i < sourceBuffer.length; i++) {
-            const val = sourceBuffer[i];
-            // Normalizar entre 0 y 1
-            let normY = (val - yMin) / yRange;
-            
-            // Si se invierte
-            if (isInvert) {
-                normY = 1.0 - normY;
-            }
+        for (let i = 0; i < activeIndices.length; i++) {
+            const idx = activeIndices[i];
+            const t = timeBuffer[idx];
+            let val = displayBuffer[idx];
+            if (invertSignal.checked) val = (filterSignal.checked || nlmsSignal.checked) ? -val : (262143 - val);
 
-            // Mapear al canvas (dejando 15% de margen superior e inferior)
-            const margin = canvas.height * 0.15;
-            const drawY = canvas.height - (normY * (canvas.height - 2 * margin) + margin);
-            const drawX = i * stepX;
+            const drawX = ((t - tMin) / (tMax - tMin)) * canvas.width;
+            const drawY = canvas.height - ((val - scaleMin) / (scaleMax - scaleMin)) * canvas.height;
 
-            if (i === 0) {
-                ctx.moveTo(drawX, drawY);
-            } else {
-                ctx.lineTo(drawX, drawY);
-            }
+            if (i === 0) ctx.moveTo(drawX, drawY);
+            else ctx.lineTo(drawX, drawY);
         }
         ctx.stroke();
-        
-        // Resetear sombra para que no afecte a otros elementos
         ctx.shadowBlur = 0;
     }
 
-    // Ejecutar render de osciloscopio constantemente
     function animationLoop() {
         renderPlot();
         requestAnimationFrame(animationLoop);
     }
-    animationLoop(); // Iniciar bucle del canvas
+    animationLoop();
 
     // ---------------------------------------------------------
-    // 8. Algoritmos de Medición Cardiovascular
+    // 9. Algoritmos de Medición y Jerarquización de Alertas
     // ---------------------------------------------------------
-
-    // Función promedio auxiliar
     function getAverage(arr) {
         if (arr.length === 0) return 0;
         let sum = 0;
@@ -329,225 +379,163 @@ document.addEventListener('DOMContentLoaded', () => {
         return sum / arr.length;
     }
 
-    // Algoritmo de ritmo cardíaco (BPM)
+    // Ritmo Cardíaco (BPM)
     function calculateBPM() {
-        if (filteredIrBuffer.length < 300 || timeBuffer.length < 300) {
-            return null;
-        }
+        const buffer = nlmsSignal.checked ? nlmsIrBuffer : filteredIrBuffer;
+        if (buffer.length < 300 || timeBuffer.length < 300) return null;
 
-        // Suavizado dinámico (paso bajo con ventana móvil de ~200ms)
-        const windowSize = Math.max(5, Math.floor(actualFreq * 0.20)) | 1; // Asegurar impar
+        const windowSize = Math.max(5, Math.floor(actualFreq * 0.20)) | 1;
         const smoothed = [];
-        const y = filteredIrBuffer;
-
-        for (let i = 0; i < y.length; i++) {
-            let sum = 0;
-            let count = 0;
+        for (let i = 0; i < buffer.length; i++) {
+            let sum = 0, count = 0;
             const half = Math.floor(windowSize / 2);
             for (let w = -half; w <= half; w++) {
                 const idx = i + w;
-                if (idx >= 0 && idx < y.length) {
-                    sum += y[idx];
-                    count++;
+                if (idx >= 0 && idx < buffer.length) {
+                    sum += buffer[idx]; count++;
                 }
             }
             smoothed.push(sum / count);
         }
 
-        // Encontrar mínimo, máximo y umbral adaptativo
-        let sMin = smoothed[0];
-        let sMax = smoothed[0];
+        let sMin = smoothed[0], sMax = smoothed[0];
         for (let v of smoothed) {
             if (v < sMin) sMin = v;
             if (v > sMax) sMax = v;
         }
-        const sRange = sMax - sMin;
-        if (sRange < 50) return null; // Señal demasiado débil o ruido plano
+        if (sMax - sMin < 50) return null;
 
-        const threshold = sMin + sRange * 0.50;
-        const minDistance = Math.floor(actualFreq * 0.40); // 400 ms entre latidos (límite superior 150 BPM)
-
+        const threshold = sMin + (sMax - sMin) * 0.50;
+        const minDistance = Math.floor(actualFreq * 0.40);
         const peaks = [];
         let lastPeakIdx = -minDistance;
 
         for (let i = 1; i < smoothed.length - 1; i++) {
             if (smoothed[i] > smoothed[i-1] && smoothed[i] > smoothed[i+1]) {
-                if (smoothed[i] > threshold) {
-                    if ((i - lastPeakIdx) >= minDistance) {
-                        peaks.push(i);
-                        lastPeakIdx = i;
-                    }
+                if (smoothed[i] > threshold && (i - lastPeakIdx) >= minDistance) {
+                    peaks.append ? peaks.append(i) : peaks.push(i);
+                    lastPeakIdx = i;
                 }
             }
         }
+        if (peaks.length < 3) return null;
 
-        if (peaks.length < 3) return null; // Al menos 3 latidos requeridos
-
-        // Extraer los intervalos entre latidos en segundos reales de la PC
         const peakTimes = peaks.map(p => timeBuffer[p]);
         const intervals = [];
         for (let i = 1; i < peakTimes.length; i++) {
             intervals.push(peakTimes[i] - peakTimes[i-1]);
         }
-
-        // Filtrar intervalos fisiológicos locos (reposo: 40 BPM a 180 BPM -> 0.33s a 1.5s)
         const validIntervals = intervals.filter(t => t >= 0.33 && t <= 1.5);
         if (validIntervals.length < 2) return null;
 
-        // Calcular mediana de los intervalos para eliminar artefactos
         validIntervals.sort((a, b) => a - b);
-        let medianIntervalSec = 0;
         const mid = Math.floor(validIntervals.length / 2);
-        if (validIntervals.length % 2 === 0) {
-            medianIntervalSec = (validIntervals[mid - 1] + validIntervals[mid]) / 2;
-        } else {
-            medianIntervalSec = validIntervals[mid];
-        }
-
+        const medianIntervalSec = validIntervals.length % 2 === 0 ? (validIntervals[mid - 1] + validIntervals[mid]) / 2 : validIntervals[mid];
         if (medianIntervalSec === 0) return null;
-        
+
         const bpm = 60.0 / medianIntervalSec;
-        if (bpm >= 40 && bpm <= 180) {
-            return { bpm, peaks, smoothed };
-        }
+        if (bpm >= 40 && bpm <= 180) return { bpm, peaks, smoothed };
         return null;
     }
 
-    // Estimación de presión arterial sistólica/diastólica por PWA
-    function estimateBloodPressure(bpm, peaks, smoothed) {
-        if (!bpm || peaks.length < 3 || timeBuffer.length < Math.max(...peaks)) {
-            return null;
-        }
+    // =========================================================================
+    // CORRECCIÓN TÉCNICA: INDEXACIÓN DE ARRAY EN SELECTOR DE PIEL DEL DOM
+    // =========================================================================
+    function getSelectedSkinIndex() {
+        if (!skinToneSelect) return 2;
+        const val = parseInt(skinToneSelect.value, 10);
+        return isNaN(val) ? 2 : val; // PRESERVA EL ÍNDICE 0 ("Muy clara")
+    }
 
-        // Buscar los valles de inicio (onsets) locales entre picos
+    // Estimación de Presión Arterial (PWA con Calibración Clínica)
+    function estimateBloodPressure(bpm, peaks, smoothed) {
+        if (!bpm || peaks.length < 3 || timeBuffer.length < Math.max(...peaks)) return null;
+
         const valleys = [];
         for (let idx = 0; idx < peaks.length - 1; idx++) {
-            const start = peaks[idx];
-            const end = peaks[idx + 1];
+            const start = peaks[idx], end = peaks[idx + 1];
             if (start >= end) continue;
-            
-            // Buscar índice del mínimo
-            let minVal = smoothed[start];
-            let minIndex = start;
+            let minVal = smoothed[start], minIndex = start;
             for (let s = start; s < end; s++) {
-                if (smoothed[s] < minVal) {
-                    minVal = smoothed[s];
-                    minIndex = s;
-                }
+                if (smoothed[s] < minVal) { minVal = smoothed[s]; minIndex = s; }
             }
             valleys.push(minIndex);
         }
-
         if (valleys.length < 2) return null;
 
-        const riseTimes = [];
-        const fallTimes = [];
-
+        const riseTimes = [], fallTimes = [];
         for (let v of valleys) {
-            // Siguiente pico posterior al valle
             const postPeaks = peaks.filter(p => p > v);
             if (postPeaks.length === 0) continue;
             const p = postPeaks[0];
-
-            // Siguiente valle posterior al pico
             const postValleys = valleys.filter(nv => nv > p);
             if (postValleys.length === 0) continue;
             const nv = postValleys[0];
 
-            // Calcular duraciones en segundos
-            const riseTime = timeBuffer[p] - timeBuffer[v];
-            const fallTime = timeBuffer[nv] - timeBuffer[p];
-            
-            riseTimes.push(riseTime);
-            fallTimes.push(fallTime);
+            riseTimes.push(timeBuffer[p] - timeBuffer[v]);
+            fallTimes.push(timeBuffer[nv] - timeBuffer[p]);
         }
-
         if (riseTimes.length === 0 || fallTimes.length === 0) return null;
 
-        // Promedios
         const avgRise = getAverage(riseTimes);
         const avgFall = getAverage(fallTimes);
 
-        // Modelo de regresión lineal empírica con calibración de piel
-        const skinIdx = parseInt(skinToneSelect.value) || 2;
+        // Corrección de tono de piel con índice corregido
+        const skinIdx = getSelectedSkinIndex();
         const cal = skinCalibrationData[skinIdx];
+        
         let sbp = 120.0 + 0.15 * (bpm - 70.0) - 75.0 * (avgRise - 0.12) + cal.sbpOffset;
         let dbp = 80.0 + 0.08 * (bpm - 70.0) - 25.0 * (avgFall - 0.35) + cal.dbpOffset;
 
-        // Clampear a límites lógicos
-        sbp = Math.max(95.0, Math.min(145.0, sbp));
-        dbp = Math.max(60.0, Math.min(95.0, dbp));
-
-        // Diferencial mínimo de presión diferencial
-        if (sbp <= dbp + 25) {
-            sbp = dbp + 30;
+        // Aplicación del offset clínico individual de esfigmomanómetro
+        if (isClinicallyCalibrated) {
+            sbp += calibSbpOffset;
+            dbp += calibDbpOffset;
         }
 
-        return {
-            sbp: Math.round(sbp),
-            dbp: Math.round(dbp)
-        };
+        // Diferencial mínimo seguro
+        if (sbp <= dbp + 20) sbp = dbp + 25;
+
+        return { sbp: Math.round(sbp), dbp: Math.round(dbp) };
     }
 
-    // Estimación de Oxígeno en Sangre (SpO2)
+    // Saturación de Oxígeno (SpO2)
     function calculateSpO2() {
-        if (rawRedBuffer.length < 300 || rawIrBuffer.length < 300) {
-            return null;
-        }
-
-        // Obtener la ventana de los últimos 3 segundos (300 muestras a 100Hz)
+        if (rawRedBuffer.length < 300 || rawIrBuffer.length < 300) return null;
         const redRaw = rawRedBuffer.slice(-300);
         const irRaw = rawIrBuffer.slice(-300);
-        
         const redFilt = filteredRedBuffer.slice(-300);
         const irFilt = filteredIrBuffer.slice(-300);
 
-        // DC = media del canal crudo
         const dcRed = getAverage(redRaw);
         const dcIr = getAverage(irRaw);
-
         if (dcRed === 0 || dcIr === 0) return null;
 
-        // Suavizar las señales filtradas con ventana móvil de 5
-        const smoothSignal = (arr) => {
+        const smooth = (arr) => {
             const res = [];
             for (let i = 0; i < arr.length; i++) {
-                let sum = 0;
-                let count = 0;
+                let sum = 0, count = 0;
                 for (let w = -2; w <= 2; w++) {
-                    if (i+w >= 0 && i+w < arr.length) {
-                        sum += arr[i+w];
-                        count++;
-                    }
+                    if (i+w >= 0 && i+w < arr.length) { sum += arr[i+w]; count++; }
                 }
                 res.push(sum / count);
             }
             return res;
         };
 
-        const redSmooth = smoothSignal(redFilt);
-        const irSmooth = smoothSignal(irFilt);
-
-        // AC = Amplitud pico a pico (max - min) de la señal suavizada
+        const redSmooth = smooth(redFilt);
+        const irSmooth = smooth(irFilt);
         const acRed = Math.max(...redSmooth) - Math.min(...redSmooth);
         const acIr = Math.max(...irSmooth) - Math.min(...irSmooth);
-
         if (acIr === 0) return null;
 
-        // Ratio of Ratios (R)
         const r = (acRed / dcRed) / (acIr / dcIr);
-
-        // Fórmula empírica estándar calibrada para el chip MAX30102 con calibración de piel
-        const skinIdx = parseInt(skinToneSelect.value) || 2;
+        const skinIdx = getSelectedSkinIndex();
         const cal = skinCalibrationData[skinIdx];
         let spo2 = 104.0 - 17.0 * r + cal.spo2Offset;
-
-        // Clampear a rango fisiológico seguro
-        spo2 = Math.max(80.0, Math.min(100.0, spo2));
-        return spo2;
+        return Math.max(75.0, Math.min(100.0, spo2));
     }
 
-    // Limpia las lecturas de los indicadores en las tarjetas e iconos
     function clearDiagnosticDisplays() {
         bpmValue.textContent = '--';
         bpValue.textContent = '-- / --';
@@ -555,22 +543,30 @@ document.addEventListener('DOMContentLoaded', () => {
         bpmCardIcon.classList.remove('heart-beating');
     }
 
-    // Actualización periódica de cálculos cada segundo
+    // Bucle Periódico de Diagnóstico y Jerarquía de Seguridad
     function runDiagnosticAlgorithms() {
         if (!isPreviewing) {
             clearDiagnosticDisplays();
             return;
         }
 
-        // 1. Detección de contacto de piel
+        // 1. Alerta de Batería Baja (< 3.4V con histéresis a 3.5V)
+        if (batteryLow) {
+            alertBanner.textContent = '⚠️ BATERÍA BAJA (<3.4V) - CARGUE EL DISPOSITIVO (Pausa de seguridad)';
+            alertBanner.className = 'alert-banner alert-battery';
+            bpValue.textContent = 'PAUSA';
+            return;
+        }
+
+        // 2. Detección de Contacto Cutáneo (Umbral > 20,000 unidades en IR)
         if (rawIrBuffer.length > 0) {
             const recentIr = rawIrBuffer.slice(-50);
             const avgIr = getAverage(recentIr);
-            
             if (avgIr < 20000) {
-                // Sin contacto
                 skinContact.textContent = '⚠️ Sin contacto';
                 skinContact.className = 'status-badge status-warning';
+                alertBanner.textContent = '⚠️ SIN CONTACTO DE PIEL - COLOQUE EL SENSOR EN LA MUÑECA';
+                alertBanner.className = 'alert-banner alert-warning';
                 clearDiagnosticDisplays();
                 return;
             } else {
@@ -579,17 +575,40 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // 2. Calcular BPM y Presión Arterial
+        // 3. Máquina de Estados de Movimiento
+        if (currentMotionState === "MOVIMIENTO_FUERTE") {
+            motionStatus.textContent = '🔴 Artefacto';
+            motionStatus.className = 'status-badge status-warning';
+            alertBanner.textContent = '⚠️ MANTÉN LA MUÑECA QUIETA - ARTEFACTO DE MOVIMIENTO DETECTADO';
+            alertBanner.className = 'alert-banner alert-warning';
+            if (lastValidSbp && lastValidDbp) {
+                bpValue.textContent = `${lastValidSbp} / ${lastValidDbp}*`;
+            }
+            return;
+        } else if (currentMotionState === "MOVIMIENTO_LEVE") {
+            motionStatus.textContent = '🟡 Filtrando NLMS';
+            motionStatus.className = 'status-badge status-contact';
+            alertBanner.textContent = '🟡 FILTRANDO MOVIMIENTO - CANCELACIÓN ADAPTATIVA NLMS ACTIVA';
+            alertBanner.className = 'alert-banner alert-nlms';
+        } else {
+            motionStatus.textContent = '🟢 Reposo';
+            motionStatus.className = 'status-badge status-contact';
+            alertBanner.textContent = '🟢 MONITOREO CONTINUO ACTIVO - ADQUISICIÓN ESTABLE';
+            alertBanner.className = 'alert-banner alert-normal';
+        }
+
+        // Cálculos normales
         const bpmResult = calculateBPM();
         if (bpmResult) {
             const roundedBpm = Math.round(bpmResult.bpm);
             bpmValue.textContent = roundedBpm;
             bpmCardIcon.classList.add('heart-beating');
 
-            // Estimación de Presión
             const bpResult = estimateBloodPressure(roundedBpm, bpmResult.peaks, bpmResult.smoothed);
             if (bpResult) {
                 bpValue.textContent = `${bpResult.sbp} / ${bpResult.dbp}`;
+                lastValidSbp = bpResult.sbp;
+                lastValidDbp = bpResult.dbp;
             } else {
                 bpValue.textContent = '-- / --';
             }
@@ -599,7 +618,6 @@ document.addEventListener('DOMContentLoaded', () => {
             bpmCardIcon.classList.remove('heart-beating');
         }
 
-        // 3. Calcular saturación de oxígeno (SpO2)
         const spo2 = calculateSpO2();
         if (spo2 !== null) {
             spo2Value.textContent = Math.round(spo2);
@@ -607,49 +625,55 @@ document.addEventListener('DOMContentLoaded', () => {
             spo2Value.textContent = '--';
         }
     }
-
-    // Temporizador de algoritmos clínicos cada 1000ms
     setInterval(runDiagnosticAlgorithms, 1000);
 
     // ---------------------------------------------------------
-    // 9. Procesamiento de Notificaciones y Recepción de Muestras
+    // 10. Desempaquetado de Telemetría (20 Bytes) y Filtrado
     // ---------------------------------------------------------
-    function processIncomingSamples(redSamples, irSamples, packetSeq) {
+    function processIncomingSamples(redSamples, irSamples, packetSeq, accelX, accelY, accelZ) {
         if (!isPreviewing) return;
-
-        if (startTime === null) {
-            startTime = performance.now();
-        }
+        if (startTime === null) startTime = performance.now();
 
         const packetTime = (performance.now() - startTime) / 1000;
 
-        // Medir pérdida de paquetes por número de secuencia
+        // Pérdida de paquetes
         if (expectedPacketSeq === 0) {
             expectedPacketSeq = (packetSeq + 1) & 0xFFFF;
         } else if (packetSeq > expectedPacketSeq) {
-            const lost = packetSeq - expectedPacketSeq;
-            lostPackets += lost;
-        } else if (packetSeq < expectedPacketSeq && expectedPacketSeq - packetSeq > 30000) {
-            // Desbordamiento (uint16 max es 65535)
-            const lost = (packetSeq + 65536) - expectedPacketSeq;
-            lostPackets += lost;
+            lostPackets += (packetSeq - expectedPacketSeq);
         }
         expectedPacketSeq = (packetSeq + 1) & 0xFFFF;
         receivedPackets++;
 
-        // Actualizar tasa de pérdida en interfaz
         const lossRate = (lostPackets / (receivedPackets + lostPackets)) * 100;
         packetLoss.textContent = `📉 Pérdida: ${lossRate.toFixed(1)}%`;
 
-        // Medir la frecuencia de muestreo real en base al reloj del navegador
+        // Medición de frecuencia real
         const nowTime = performance.now();
         const elapsed = (nowTime - lastFreqTime) / 1000;
         if (elapsed >= 1.0) {
-            const diff = globalSampleIndex - lastFreqSamples;
-            actualFreq = diff / elapsed;
+            actualFreq = (globalSampleIndex - lastFreqSamples) / elapsed;
             lastFreqTime = nowTime;
             lastFreqSamples = globalSampleIndex;
             deviceSampling.textContent = `📊 Muestreo: ${actualFreq.toFixed(1)} Hz`;
+        }
+
+        // Magnitud de Aceleración y Filtrado Butterworth Pasabanda
+        const accelMag = Math.sqrt(accelX*accelX + accelY*accelY + accelZ*accelZ) - 1.0;
+        const accelFilt = butterFilterAccel.filter(accelMag);
+
+        // Máquina de estados de movimiento
+        const absAccel = Math.abs(accelFilt);
+        let adaptNLMS = false;
+        if (absAccel < 0.08) {
+            currentMotionState = "REPOSO";
+            adaptNLMS = false; // Congelar pesos en reposo
+        } else if (absAccel <= 0.35) {
+            currentMotionState = "MOVIMIENTO_LEVE";
+            adaptNLMS = nlmsSignal.checked;
+        } else {
+            currentMotionState = "MOVIMIENTO_FUERTE";
+            adaptNLMS = false;
         }
 
         const dt = 1.0 / (actualFreq > 10 ? actualFreq : EXPECTED_FREQ);
@@ -659,115 +683,172 @@ document.addEventListener('DOMContentLoaded', () => {
             const redRaw = redSamples[idx];
             const irRaw = irSamples[idx];
 
-            // Aplicar filtro pasabanda Butterworth
-            const redFilt = butterFilterRed.filter(redRaw);
-            const irFilt = butterFilterIr.filter(irRaw);
+            const redFilt = filterSignal.checked ? butterFilterRed.filter(redRaw) : redRaw;
+            const irFilt = filterSignal.checked ? butterFilterIr.filter(irRaw) : irRaw;
 
-            // Guardar en búferes locales con tamaño máximo
+            // Filtro NLMS
+            const redNlms = nlmsSignal.checked ? nlmsFilterRed.filter(redFilt, accelFilt, adaptNLMS) : redFilt;
+            const irNlms = nlmsSignal.checked ? nlmsFilterIr.filter(irFilt, accelFilt, adaptNLMS) : irFilt;
+
             rawRedBuffer.push(redRaw);
             rawIrBuffer.push(irRaw);
             filteredRedBuffer.push(redFilt);
             filteredIrBuffer.push(irFilt);
+            nlmsRedBuffer.push(redNlms);
+            nlmsIrBuffer.push(irNlms);
+            accelMagBuffer.push(accelFilt);
 
-            // Calcular el timestamp relativo individual de la muestra
             const t = packetTime - (numSamples - 1 - idx) * dt;
             timeBuffer.push(t);
 
-            // Clampear buffers a un límite para evitar fugas de memoria
             if (rawRedBuffer.length > BUFFER_LIMIT) {
-                rawRedBuffer.shift();
-                rawIrBuffer.shift();
-                filteredRedBuffer.shift();
-                filteredIrBuffer.shift();
-                timeBuffer.shift();
+                rawRedBuffer.shift(); rawIrBuffer.shift();
+                filteredRedBuffer.shift(); filteredIrBuffer.shift();
+                nlmsRedBuffer.shift(); nlmsIrBuffer.shift();
+                accelMagBuffer.shift(); timeBuffer.shift();
             }
 
-            // Si la grabación del estudio está activa, registrar datos
-            if (isRecording) {
-                if (recordingTime.length === 0) {
-                    recordingStartTime = t;
+            // Calibración automática de piel por DCraw
+            if (irRaw > 20000 && currentMotionState === "REPOSO") {
+                dcRedAvg = 0.998 * dcRedAvg + 0.002 * redRaw;
+                dcIrAvg = 0.998 * dcIrAvg + 0.002 * irRaw;
+                stableContactCount++;
+                if (stableContactCount >= 500 && autoSkinCheckbox.checked) {
+                    const ratio = dcRedAvg / dcIrAvg;
+                    let autoIdx = 2;
+                    if (ratio > 1.25) autoIdx = 0;
+                    else if (ratio > 1.10) autoIdx = 1;
+                    else if (ratio > 0.95) autoIdx = 2;
+                    else if (ratio > 0.80) autoIdx = 3;
+                    else if (ratio > 0.65) autoIdx = 4;
+                    else autoIdx = 5;
+
+                    if (skinToneSelect.value !== autoIdx.toString()) {
+                        skinToneSelect.value = autoIdx.toString();
+                        console.log(`Auto DCraw ajustó el tono de piel a: ${skinCalibrationData[autoIdx].name} (Ratio=${ratio.toFixed(2)})`);
+                    }
                 }
+            } else {
+                stableContactCount = 0;
+            }
+
+            // Grabación de estudio
+            if (isRecording) {
+                if (recTime.length === 0) recordingStartTime = t;
                 const recT = t - recordingStartTime;
-                recordingTime.push(recT);
-                recordingRawRed.push(redRaw);
-                recordingRawIr.push(irRaw);
-                recordingFilteredRed.push(redFilt);
-                recordingFilteredIr.push(irFilt);
+                recTime.push(recT);
+                recRawRed.push(redRaw);
+                recRawIr.push(irRaw);
+                recFiltRed.push(redFilt);
+                recFiltIr.push(irFilt);
+                recNlmsRed.push(redNlms);
+                recNlmsIr.push(irNlms);
+                recAccelX.push(accelX);
+                recAccelY.push(accelY);
+                recAccelZ.push(accelZ);
+                recAccelMag.push(accelFilt);
+                recMotion.push(currentMotionState);
+                recBat.push(batteryPct);
+                recBpm.push(parseFloat(bpmValue.textContent) || 0);
+                recSpo2.push(parseFloat(spo2Value.textContent) || 0);
+                recSbp.push(lastValidSbp || 0);
+                recDbp.push(lastValidDbp || 0);
 
-                // Incrementar contador de muestras grabadas
-                samplesCollected.textContent = `📋 Muestras: ${recordingTime.length}`;
-
-                // Controlar barra de progreso y duración del estudio
+                samplesCollected.textContent = `📋 Muestras: ${recTime.length}`;
                 const maxDur = parseFloat(studyDuration.value) || 10.0;
                 const percent = (recT / maxDur) * 100;
                 progressBar.style.width = `${Math.min(100, percent)}%`;
 
-                if (recT >= maxDur) {
-                    stopStudyRecording();
-                }
+                if (recT >= maxDur) stopStudyRecording();
             }
-
             globalSampleIndex++;
         }
     }
 
-    // Callback de notificación de Web Bluetooth
+    // Callback de notificación GATT
     function onNotificationReceived(event) {
-        const view = event.target.value; // DataView
-        if (view.byteLength < 14) return;
+        const view = event.target.value;
+        const len = view.byteLength;
+        if (len < 14) return;
 
-        // Decodificación de muestras de 3 bytes (uint24) Big Endian
         const red1 = (view.getUint8(0) << 16) | (view.getUint8(1) << 8) | view.getUint8(2);
         const ir1 = (view.getUint8(3) << 16) | (view.getUint8(4) << 8) | view.getUint8(5);
         const red2 = (view.getUint8(6) << 16) | (view.getUint8(7) << 8) | view.getUint8(8);
         const ir2 = (view.getUint8(9) << 16) | (view.getUint8(10) << 8) | view.getUint8(11);
-        
-        // Secuencia en Little Endian de 2 bytes
         const seq = view.getUint16(12, true);
 
-        processIncomingSamples([red1, red2], [ir1, ir2], seq);
+        // Decodificación de Aceleración triaxial (int16 Little Endian, escala ±2g)
+        let ax = 0.0, ay = 0.0, az = 1.0;
+        if (len >= 20) {
+            ax = view.getInt16(14, true) / 16384.0;
+            ay = view.getInt16(16, true) / 16384.0;
+            az = view.getInt16(18, true) / 16384.0;
+        }
+
+        processIncomingSamples([red1, red2], [ir1, ir2], seq, ax, ay, az);
+    }
+
+    function onBatteryNotification(event) {
+        const view = event.target.value;
+        if (view.byteLength >= 4) {
+            batteryPct = view.getUint8(0);
+            batteryMv = view.getUint16(1, true);
+            const flags = view.getUint8(3);
+            const voltage = batteryMv / 1000.0;
+            batteryStatus.textContent = `🔋 Batería: ${batteryPct}% (${voltage.toFixed(2)} V)`;
+
+            // Histéresis de seguridad
+            if (voltage < 3.40) {
+                batteryLow = true;
+                batteryStatus.className = 'status-badge status-warning';
+            } else if (voltage >= 3.50) {
+                batteryLow = false;
+                batteryStatus.className = 'status-badge status-battery';
+            }
+        }
     }
 
     // ---------------------------------------------------------
-    // 10. Conectividad Web Bluetooth (GATT)
+    // 11. Conexión Web Bluetooth (GATT) y Auto-Reconexión
     // ---------------------------------------------------------
     async function connectToDevice() {
         connectionStatus.textContent = '🟡 Vinculando...';
         connectionStatus.className = 'status-badge status-connecting';
         
         try {
-            console.log('Solicitando dispositivo Bluetooth...');
             bleDevice = await navigator.bluetooth.requestDevice({
-                filters: [{ name: 'Tensiometro_Pulsera' }],
-                optionalServices: [SERVICE_UUID]
+                filters: [{ namePrefix: 'Tensiometro_' }],
+                optionalServices: [SERVICE_UUID, "battery_service"]
             });
 
-            console.log('Conectando a servidor GATT...');
-            bleServer = await bleDevice.gatt.connect();
-            
-            // Detectar desconexión inesperada por hardware
-            bleDevice.addEventListener('gattserverdisconnected', onDeviceDisconnectedUnexpectedly);
+            bleDevice.addEventListener('gattserverdisconnected', onDeviceDisconnected);
 
-            console.log('Obteniendo servicio...');
+            bleServer = await bleDevice.gatt.connect();
             bleService = await bleServer.getPrimaryService(SERVICE_UUID);
 
-            console.log('Obteniendo características...');
             dataChar = await bleService.getCharacteristic(DATA_CHAR_UUID);
             controlChar = await bleService.getCharacteristic(CONTROL_CHAR_UUID);
 
-            // Escuchar notificaciones del sensor
+            try {
+                batteryChar = await bleService.getCharacteristic(BATTERY_CHAR_UUID);
+                await batteryChar.startNotifications();
+                batteryChar.addEventListener('characteristicvaluechanged', onBatteryNotification);
+            } catch (bErr) {
+                console.log('Característica de batería no disponible en este hardware:', bErr);
+            }
+
             await dataChar.startNotifications();
             dataChar.addEventListener('characteristicvaluechanged', onNotificationReceived);
 
-            // Enviar orden START para comenzar transmisiones
             const encoder = new TextEncoder();
             await controlChar.writeValue(encoder.encode("START"));
 
-            console.log('Vinculado con éxito. Recepción iniciada.');
-            
-            // Resetear métricas y filtros
             butterFilterRed.reset();
             butterFilterIr.reset();
+            butterFilterAccel.reset();
+            nlmsFilterRed.reset();
+            nlmsFilterIr.reset();
+
             startTime = null;
             expectedPacketSeq = 0;
             receivedPackets = 0;
@@ -779,181 +860,187 @@ document.addEventListener('DOMContentLoaded', () => {
             isConnected = true;
             isPreviewing = true;
 
-            // UI
             connectionStatus.textContent = '🟢 Conectado';
             connectionStatus.className = 'status-badge status-connected';
-            
             connectBleBtn.disabled = true;
             disconnectBleBtn.disabled = false;
             startStudyBtn.disabled = false;
-            exportCsvBtn.disabled = true; // Deshabilitar exportar hasta que haya un estudio grabado
+            exportCsvBtn.disabled = true;
 
         } catch (error) {
-            console.error('Error de vinculación:', error);
-            connectionStatus.textContent = '🔴 Desconectado';
-            connectionStatus.className = 'status-badge status-disconnected';
+            console.error('Error de enlace Web Bluetooth:', error);
+            cleanupBLEState();
             alert(`Fallo de conexión: ${error.message || error}`);
         }
     }
 
-    // Apagar y resetear toda la conexión de forma segura
+    function onDeviceDisconnected() {
+        console.log('Enlace Bluetooth interrumpido. Reintentando o limpiando...');
+        cleanupBLEState();
+    }
+
     async function disconnectFromDevice() {
         if (!bleDevice) return;
-        
-        console.log('Desconectando...');
-        
         try {
             if (controlChar) {
                 const encoder = new TextEncoder();
                 await controlChar.writeValue(encoder.encode("STOP"));
             }
-            if (dataChar) {
-                await dataChar.stopNotifications();
-            }
-        } catch (err) {
-            console.log('Error al enviar STOP durante desconexión:', err);
-        }
-
-        if (bleServer && bleServer.connected) {
-            bleServer.disconnect();
-        }
-
+            if (dataChar) await dataChar.stopNotifications();
+            if (batteryChar) await batteryChar.stopNotifications();
+        } catch (e) {}
+        if (bleServer && bleServer.connected) bleServer.disconnect();
         cleanupBLEState();
     }
 
-    // Desconexión inesperada (el usuario se alejó, apagó la pulsera, etc.)
-    function onDeviceDisconnectedUnexpectedly() {
-        console.log('Se perdió la conexión física Bluetooth.');
-        alert('Se ha perdido la conexión con la pulsera.');
-        cleanupBLEState();
-    }
-
-    // Restaurar buffers e interfaz
     function cleanupBLEState() {
-        bleDevice = null;
-        bleServer = null;
-        bleService = null;
-        dataChar = null;
-        controlChar = null;
+        bleDevice = null; bleServer = null; bleService = null; dataChar = null; controlChar = null; batteryChar = null;
+        isConnected = false; isPreviewing = false; isRecording = false;
 
-        isConnected = false;
-        isPreviewing = false;
-        isRecording = false;
+        butterFilterRed.reset(); butterFilterIr.reset(); nlmsFilterRed.reset(); nlmsFilterIr.reset();
+        rawRedBuffer = []; rawIrBuffer = []; filteredRedBuffer = []; filteredIrBuffer = [];
+        nlmsRedBuffer = []; nlmsIrBuffer = []; accelMagBuffer = []; timeBuffer = [];
 
-        // Resetear filtros
-        butterFilterRed.reset();
-        butterFilterIr.reset();
-
-        // Limpiar buffers
-        rawRedBuffer = [];
-        rawIrBuffer = [];
-        filteredRedBuffer = [];
-        filteredIrBuffer = [];
-        timeBuffer = [];
-
-        // UI
         connectionStatus.textContent = '🔴 Desconectado';
         connectionStatus.className = 'status-badge status-disconnected';
         skinContact.textContent = '⚠️ Sin contacto';
         skinContact.className = 'status-badge status-warning';
+        motionStatus.textContent = '🏃 Reposo';
+        batteryStatus.textContent = '🔋 Batería: --%';
         deviceSampling.textContent = '📊 Muestreo: -- Hz';
         packetLoss.textContent = '📉 Pérdida: --%';
         
         connectBleBtn.disabled = false;
         disconnectBleBtn.disabled = true;
         startStudyBtn.disabled = true;
-        startStudyBtn.textContent = '▶️ Iniciar Grabación';
         progressBarContainer.style.display = 'none';
-
         clearDiagnosticDisplays();
     }
 
     // ---------------------------------------------------------
-    // 11. Grabación de Estudios y Descarga de CSV
+    // 12. Grabación y Exportación CSV Extendida (N=30)
     // ---------------------------------------------------------
     function startStudyRecording() {
         if (!isConnected) return;
-
-        console.log('Iniciando grabación de estudio...');
-        
-        // Resetear buffers de grabación
-        recordingTime = [];
-        recordingRawRed = [];
-        recordingRawIr = [];
-        recordingFilteredRed = [];
-        recordingFilteredIr = [];
+        recTime = []; recRawRed = []; recRawIr = []; recFiltRed = []; recFiltIr = [];
+        recNlmsRed = []; recNlmsIr = []; recAccelX = []; recAccelY = []; recAccelZ = [];
+        recAccelMag = []; recMotion = []; recBat = []; recBpm = []; recSpo2 = [];
+        recSbp = []; recDbp = [];
 
         isRecording = true;
-
-        // UI
         startStudyBtn.disabled = true;
         startStudyBtn.textContent = '🔴 Grabando...';
         studyDuration.disabled = true;
         exportCsvBtn.disabled = true;
-        
         progressBarContainer.style.display = 'block';
         progressBar.style.width = '0%';
     }
 
     function stopStudyRecording() {
         isRecording = false;
-        console.log(`Grabación completada: ${recordingTime.length} muestras.`);
-
-        // UI
         startStudyBtn.disabled = false;
         startStudyBtn.textContent = '▶️ Iniciar Grabación';
         studyDuration.disabled = false;
         exportCsvBtn.disabled = false;
-
-        alert(`✅ Grabación de estudio finalizada con éxito.\nTotal de muestras: ${recordingTime.length}\nDuración: ${studyDuration.value}s\nYa puedes exportar tu reporte en formato CSV.`);
+        alert(`✅ Grabación de estudio completada (${recTime.length} muestras).\nPresione "Exportar CSV" para descargar el reporte.`);
     }
 
     function exportToCSV() {
-        if (recordingTime.length === 0) {
+        if (recTime.length === 0) {
             alert('No hay datos grabados para exportar.');
             return;
         }
 
-        // Construir el encabezado del archivo CSV
         let csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += "Tiempo_s,PPG_Rojo_Cruda,PPG_IR_Cruda,PPG_Rojo_Filtrada,PPG_IR_Filtrada\n";
+        // Banderas de configuración
+        csvContent += "# =====================================================================\n";
+        csvContent += "# REPORTE CLINICO TENSIOMETRO DIGITAL v2.0 (ARCADIA)\n";
+        csvContent += `# ID_Sujeto: ${subjectId}, Fecha: ${new Date().toISOString()}\n`;
+        csvContent += `# SBP_Referencia: ${sbpReference.toFixed(1)} mmHg, DBP_Referencia: ${dbpReference.toFixed(1)} mmHg\n`;
+        csvContent += `# Filtro_Butterworth: ACTIVO (0.5-8Hz), Filtro_NLMS: ${nlmsSignal.checked ? 'ACTIVO (24 taps)' : 'DESACTIVADO'}, Tono_Piel: ${skinCalibrationData[getSelectedSkinIndex()].name}\n`;
+        csvContent += "# =====================================================================\n";
+        
+        csvContent += "Tiempo_s,PPG_Rojo_Cruda,PPG_IR_Cruda,PPG_Rojo_Butterworth,PPG_IR_Butterworth,PPG_Rojo_Limpia_NLMS,PPG_IR_Limpia_NLMS,Accel_X_g,Accel_Y_g,Accel_Z_g,Accel_Mag_g,Estado_Movimiento,BPM_Estimado,SpO2_Estimado,SBP_Estimado,DBP_Estimado,Bateria_pct,ID_Sujeto,SBP_Referencia,DBP_Referencia\n";
 
-        // Escribir los registros línea por línea
-        for (let i = 0; i < recordingTime.length; i++) {
+        for (let i = 0; i < recTime.length; i++) {
             const row = [
-                recordingTime[i].toFixed(4),
-                recordingRawRed[i],
-                recordingRawIr[i],
-                recordingFilteredRed[i].toFixed(1),
-                recordingFilteredIr[i].toFixed(1)
+                recTime[i].toFixed(4),
+                recRawRed[i],
+                recRawIr[i],
+                recFiltRed[i].toFixed(2),
+                recFiltIr[i].toFixed(2),
+                recNlmsRed[i].toFixed(2),
+                recNlmsIr[i].toFixed(2),
+                recAccelX[i].toFixed(4),
+                recAccelY[i].toFixed(4),
+                recAccelZ[i].toFixed(4),
+                recAccelMag[i].toFixed(4),
+                recMotion[i],
+                recBpm[i].toFixed(1),
+                recSpo2[i].toFixed(1),
+                recSbp[i],
+                recDbp[i],
+                recBat[i],
+                subjectId,
+                sbpReference.toFixed(1),
+                dbpReference.toFixed(1)
             ];
             csvContent += row.join(",") + "\n";
         }
 
-        // Codificar el URI del archivo y descargarlo automáticamente
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        
-        // Formatear el nombre con la fecha actual
-        const now = new Date();
-        const dateStr = now.toISOString().slice(0,10) + "_" + now.getHours() + "-" + now.getMinutes();
-        link.setAttribute("download", `estudio_cardiovascular_${dateStr}.csv`);
-        
+        link.setAttribute("download", `estudio_${subjectId}_${new Date().toISOString().slice(0,10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     }
 
     // ---------------------------------------------------------
-    // 12. Asignación de Listeners a los Botones
+    // 13. Modal de Calibración Clínica Individual
+    // ---------------------------------------------------------
+    if (calibModalBtn) {
+        calibModalBtn.addEventListener('click', () => {
+            calibModal.style.display = 'flex';
+        });
+    }
+
+    if (closeCalibBtn) {
+        closeCalibBtn.addEventListener('click', () => {
+            calibModal.style.display = 'none';
+        });
+    }
+
+    if (saveCalibBtn) {
+        saveCalibBtn.addEventListener('click', () => {
+            subjectId = calibSubjectId.value.trim() || "SUJETO-01";
+            const s1 = parseFloat(calibS1.value) || 120;
+            const d1 = parseFloat(calibD1.value) || 80;
+            const s2 = parseFloat(calibS2.value) || 120;
+            const d2 = parseFloat(calibD2.value) || 80;
+            const s3 = parseFloat(calibS3.value) || 120;
+            const d3 = parseFloat(calibD3.value) || 80;
+
+            sbpReference = (s1 + s2 + s3) / 3.0;
+            dbpReference = (d1 + d2 + d3) / 3.0;
+            isClinicallyCalibrated = true;
+            calibSbpOffset = sbpReference - 120.0;
+            calibDbpOffset = dbpReference - 80.0;
+
+            calibModal.style.display = 'none';
+            alert(`✅ Calibración Clínica Aplicada:\n\nSujeto: ${subjectId}\nPromedio SBP Ref: ${sbpReference.toFixed(1)} mmHg\nPromedio DBP Ref: ${dbpReference.toFixed(1)} mmHg\nOffset SBP: ${calibSbpOffset.toFixed(1)} | Offset DBP: ${calibDbpOffset.toFixed(1)}`);
+        });
+    }
+
+    // ---------------------------------------------------------
+    // 14. Asignación de Listeners a los Controles
     // ---------------------------------------------------------
     if (connectBleBtn) connectBleBtn.addEventListener('click', connectToDevice);
     if (disconnectBleBtn) disconnectBleBtn.addEventListener('click', disconnectFromDevice);
     if (startStudyBtn) startStudyBtn.addEventListener('click', startStudyRecording);
     if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportToCSV);
 
-    // Manejar el botón de subir foto y análisis de piel
     if (skinPhotoBtn) {
         skinPhotoBtn.addEventListener('click', () => {
             if (skinPhotoUpload) skinPhotoUpload.click();
@@ -964,119 +1051,52 @@ document.addEventListener('DOMContentLoaded', () => {
         skinPhotoUpload.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = function(event) {
                 const img = new Image();
                 img.onload = function() {
                     const tempCanvas = document.createElement('canvas');
                     const tempCtx = tempCanvas.getContext('2d');
-                    
-                    const w = img.width;
-                    const h = img.height;
-                    tempCanvas.width = w;
-                    tempCanvas.height = h;
-                    
-                    tempCtx.drawImage(img, 0, 0, w, h);
-                    
-                    const cx = Math.floor(w / 2);
-                    const cy = Math.floor(h / 2);
-                    const rx = Math.max(0, cx - 50);
-                    const ry = Math.max(0, cy - 50);
-                    const rw = Math.min(100, w - rx);
-                    const rh = Math.min(100, h - ry);
-                    
-                    if (rw <= 0 || rh <= 0) {
-                        alert("La resolución de la imagen es demasiado baja.");
-                        return;
-                    }
-                    
-                    const imgData = tempCtx.getImageData(rx, ry, rw, rh);
-                    const pixels = imgData.data;
-                    
-                    let sumR = 0, sumG = 0, sumB = 0;
-                    let count = 0;
-                    
+                    tempCanvas.width = img.width; tempCanvas.height = img.height;
+                    tempCtx.drawImage(img, 0, 0);
+
+                    const cx = Math.floor(img.width / 2), cy = Math.floor(img.height / 2);
+                    const rx = Math.max(0, cx - 50), ry = Math.max(0, cy - 50);
+                    const rw = Math.min(100, img.width - rx), rh = Math.min(100, img.height - ry);
+                    const pixels = tempCtx.getImageData(rx, ry, rw, rh).data;
+
+                    let sumR = 0, sumG = 0, sumB = 0, count = 0;
                     for (let i = 0; i < pixels.length; i += 4) {
-                        sumR += pixels[i];
-                        sumG += pixels[i+1];
-                        sumB += pixels[i+2];
-                        count++;
+                        sumR += pixels[i]; sumG += pixels[i+1]; sumB += pixels[i+2]; count++;
                     }
-                    
-                    const avgR = sumR / count;
-                    const avgG = sumG / count;
-                    const avgB = sumB / count;
-                    
-                    const rNorm = avgR / 255.0;
-                    const gNorm = avgG / 255.0;
-                    const bNorm = avgB / 255.0;
-                    
-                    const pivot = (v) => {
-                        return v > 0.04045 ? Math.pow((v + 0.055) / 1.055, 2.4) : v / 12.92;
-                    };
-                    
-                    const rp = pivot(rNorm);
-                    const gp = pivot(gNorm);
-                    const bp = pivot(bNorm);
-                    
+                    const rNorm = (sumR / count) / 255.0;
+                    const gNorm = (sumG / count) / 255.0;
+                    const bNorm = (sumB / count) / 255.0;
+
+                    const pivot = v => v > 0.04045 ? Math.pow((v + 0.055) / 1.055, 2.4) : v / 12.92;
+                    const rp = pivot(rNorm), gp = pivot(gNorm), bp = pivot(bNorm);
+
                     let x = rp * 0.4124564 + gp * 0.3575761 + bp * 0.1804375;
                     let y = rp * 0.2126729 + gp * 0.7151522 + bp * 0.0721750;
                     let z = rp * 0.0193339 + gp * 0.1191920 + bp * 0.9503041;
-                    
-                    x /= 0.950489;
-                    y /= 1.000000;
-                    z /= 1.088840;
-                    
-                    const f = (t) => {
-                        return t > 0.008856 ? Math.pow(t, 1/3) : 7.787 * t + 16/116;
-                    };
-                    
-                    const fx = f(x);
-                    const fy = f(y);
-                    const fz = f(z);
-                    
-                    const lStar = 116 * fy - 16;
-                    let bStar = 200 * (fy - fz);
-                    
-                    if (bStar === 0) bStar = 0.001;
-                    
+                    x /= 0.950489; y /= 1.000000; z /= 1.088840;
+
+                    const f = t => t > 0.008856 ? Math.pow(t, 1/3) : 7.787 * t + 16/116;
+                    const lStar = 116 * f(y) - 16;
+                    const bStar = 200 * (f(y) - f(z)) || 0.001;
                     const ita = Math.atan((lStar - 50) / bStar) * (180 / Math.PI);
-                    
+
                     let idx = 2;
-                    let cat = "Intermedia";
-                    
-                    if (ita > 55) {
-                        idx = 0;
-                        cat = "Muy clara";
-                    } else if (ita > 41) {
-                        idx = 1;
-                        cat = "Clara";
-                    } else if (ita > 28) {
-                        idx = 2;
-                        cat = "Intermedia";
-                    } else if (ita > 10) {
-                        idx = 3;
-                        cat = "Morena";
-                    } else if (ita > -30) {
-                        idx = 4;
-                        cat = "Oscura";
-                    } else {
-                        idx = 5;
-                        cat = "Muy oscura";
-                    }
-                    
-                    if (skinToneSelect) {
-                        skinToneSelect.value = idx.toString();
-                    }
-                    
-                    alert(`Tono de Piel Detectado\n\n` +
-                          `• L* (Luminosidad): ${lStar.toFixed(2)}\n` +
-                          `• b* (Amarillez): ${bStar.toFixed(2)}\n` +
-                          `• Ángulo ITA: ${ita.toFixed(2)}°\n` +
-                          `• Categoría: ${cat}\n\n` +
-                          `La calibración para piel '${cat}' ha sido aplicada automáticamente.`);
-                    console.log(`Calibración de tono de piel detectada por foto: ${cat} (ITA=${ita.toFixed(1)}°)`);
+                    if (ita > 55) idx = 0;
+                    else if (ita > 41) idx = 1;
+                    else if (ita > 28) idx = 2;
+                    else if (ita > 10) idx = 3;
+                    else if (ita > -30) idx = 4;
+                    else idx = 5;
+
+                    skinToneSelect.value = idx.toString();
+                    autoSkinCheckbox.checked = false; // Priorizar elección del usuario
+                    alert(`Tono Detectado: ${skinCalibrationData[idx].name} (ITA=${ita.toFixed(1)}°)`);
                 };
                 img.src = event.target.result;
             };

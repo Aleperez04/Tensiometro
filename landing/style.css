@@ -887,3 +887,78 @@ code {
     }
 }
 
+/* Nuevos Estilos Versión 2.0: Batería, Movimiento, Alertas y Modal */
+.status-battery {
+    background-color: rgba(40, 167, 69, 0.15);
+    color: #28a745;
+    border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.status-motion {
+    background-color: rgba(179, 142, 93, 0.15);
+    color: #4a3c31;
+    border: 1px solid rgba(179, 142, 93, 0.3);
+}
+
+.alert-banner {
+    width: 100%;
+    margin: 8px 0;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-align: center;
+    box-sizing: border-box;
+    transition: all 0.3s ease;
+}
+
+.alert-normal {
+    background-color: #E8F5E9;
+    color: #2E7D32;
+    border: 1px solid #A5D6A7;
+}
+
+.alert-nlms {
+    background-color: #F8FAFC;
+    color: #1B365D;
+    border: 1px solid #CBD5E1;
+}
+
+.alert-warning {
+    background-color: #FFF3CD;
+    color: #856404;
+    border: 1px solid #FFEEBA;
+    animation: status-pulse 1.5s infinite;
+}
+
+.alert-battery {
+    background-color: #FFDDDD;
+    color: #9D2449;
+    border: 1px solid #9D2449;
+    animation: status-pulse 1.0s infinite;
+}
+
+/* Modal de Calibración Clínica */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.modal-content {
+    background: #FFFFFF;
+    border: 2px solid #B38E5D;
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 480px;
+    width: 90%;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+

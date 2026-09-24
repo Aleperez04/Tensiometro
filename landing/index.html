@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estación Médica de Diagnóstico Cardiovascular - GobMx</title>
+    <title>Estación Médica de Diagnóstico Cardiovascular - GobMx v2.0</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -20,9 +20,10 @@
             </div>
             <nav class="nav-links">
                 <a href="#inicio">Inicio</a>
+                <a href="#monitor">Consola</a>
                 <a href="#diagnosticos">Diagnósticos</a>
-                <a href="#hardware">Hardware</a>
-                <a href="#codigo">Código</a>
+                <a href="#hardware">Hardware v2.0</a>
+                <a href="#codigo">Firmware v2.0</a>
             </nav>
         </div>
     </header>
@@ -31,14 +32,14 @@
     <section id="inicio" class="hero-section">
         <div class="hero-container">
             <div class="hero-content">
-                <span class="badge">PROYECTO MÉDICO AUTÓNOMO</span>
+                <span class="badge">PROYECTO MÉDICO AUTÓNOMO • VERSIÓN 2.0</span>
                 <h1>Estación de Diagnóstico Cardiovascular</h1>
-                <p>Monitoreo no invasivo de ritmo cardíaco, presión arterial y saturación de oxígeno en sangre ($SpO_2$) en tiempo real. Desarrollada bajo los lineamientos estéticos y de accesibilidad institucional.</p>
+                <p>Monitoreo continuo no invasivo de ritmo cardíaco (BPM), presión arterial (PWA) y saturación de oxígeno ($SpO_2$) con cancelación de movimiento por acelerometría (NLMS), batería autónoma Li-Po 3.7V y calibración clínica individual.</p>
                 <div class="hero-actions">
                     <a href="file:///C:/Users/alepe/Downloads/tensiometro-final.exe" class="btn btn-primary" id="downloadBtn">
                         <span class="icon">💿</span> Descargar Aplicación (v2.1)
                     </a>
-                    <a href="#hardware" class="btn btn-secondary">Guía de Ensamble</a>
+                    <a href="#hardware" class="btn btn-secondary">Guía de Ensamble y Alimentación</a>
                 </div>
                 <div class="file-info">Ejecutable Standalone (.exe) para Windows • 68.2 MB</div>
             </div>
@@ -51,8 +52,8 @@
     <!-- Consola de Monitorización en Tiempo Real -->
     <section id="monitor" class="monitor-section">
         <div class="section-header">
-            <h2>Consola de Diagnóstico en Tiempo Real</h2>
-            <p>Monitorea tu señal cardiovascular y visualiza la forma de onda pulsátil mediante conexión inalámbrica directa con la pulsera.</p>
+            <h2>Consola de Diagnóstico en Tiempo Real (v2.0)</h2>
+            <p>Monitorea tu señal cardiovascular por Web Bluetooth GATT con cancelación adaptativa NLMS y telemetría de energía.</p>
         </div>
         
         <div class="monitor-container">
@@ -62,7 +63,13 @@
                 
                 <div class="status-indicator-box">
                     <span id="connectionStatus" class="status-badge status-disconnected">🔴 Desconectado</span>
+                    <span id="batteryStatus" class="status-badge status-battery">🔋 Batería: --%</span>
                     <span id="skinContact" class="status-badge status-warning">⚠️ Sin contacto</span>
+                    <span id="motionStatus" class="status-badge status-motion">🏃 Reposo</span>
+                </div>
+
+                <div id="alertBanner" class="alert-banner alert-normal">
+                    🟢 SISTEMA EN ESPERA - VINCULE LA PULSERA
                 </div>
                 
                 <div class="device-info-box">
@@ -75,15 +82,19 @@
                     <button id="connectBleBtn" class="btn btn-primary">⚡ Conectar Pulsera</button>
                     <button id="disconnectBleBtn" class="btn btn-danger" disabled>🔌 Desconectar</button>
                     <button id="startStudyBtn" class="btn btn-secondary" disabled>▶️ Iniciar Grabación</button>
-                    <button id="exportCsvBtn" class="btn btn-outline" disabled>📥 Exportar CSV</button>
+                    <button id="exportCsvBtn" class="btn btn-outline" disabled>📥 Exportar CSV (N=30)</button>
                 </div>
+
+                <button id="calibModalBtn" class="btn btn-outline" style="width: 100%; margin-top: 8px; font-size: 11px;">
+                    ⚖️ Calibración Clínica (Esfigmomanómetro)
+                </button>
                 
                 <div class="study-settings">
                     <label for="studyDuration" class="settings-label">Duración del Estudio (segundos):</label>
                     <input type="number" id="studyDuration" value="10" min="5" max="60" class="input-number">
                     
                     <div class="skin-calibration-settings" style="margin-top: 10px;">
-                        <label for="skinToneSelect" class="settings-label">Calibración de Piel:</label>
+                        <label for="skinToneSelect" class="settings-label">Calibración de Piel (Auto DCraw):</label>
                         <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
                             <select id="skinToneSelect" class="input-select" style="flex: 1; height: 32px; background-color: #fdfaf4; border: 1px solid #d4c19c; border-radius: 4px; font-family: inherit; font-size: 13px; color: #4a3c31; padding: 0 4px; box-sizing: border-box;">
                                 <option value="0">Muy clara (ITA > 55°)</option>
@@ -96,6 +107,9 @@
                             <button id="skinPhotoBtn" class="btn btn-secondary" style="height: 32px; font-size: 11px; padding: 0 8px; margin: 0; min-width: auto; background-color: #e5d8c3; border-color: #c9bda5;">📷 Foto</button>
                             <input type="file" id="skinPhotoUpload" accept="image/*" style="display: none;">
                         </div>
+                        <label style="font-size: 11px; margin-top: 4px; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                            <input type="checkbox" id="autoSkinCheckbox" checked> Detección Automática por DCraw
+                        </label>
                     </div>
 
                     <div class="progress-bar-container" id="progressBarContainer">
@@ -107,13 +121,16 @@
             <!-- Columna del Osciloscopio (Canvas) -->
             <div class="oscilloscope-panel">
                 <div class="oscilloscope-header">
-                    <span class="osc-title">SEÑAL FOTOPLETISMOGRÁFICA (PPG IR)</span>
+                    <span class="osc-title">SEÑAL FOTOPLETISMOGRÁFICA (PPG IR LIMPIA - NLMS + BUTTERWORTH)</span>
                     <div class="osc-controls">
                         <label class="control-checkbox">
                             <input type="checkbox" id="invertSignal"> Invertir Onda
                         </label>
                         <label class="control-checkbox">
-                            <input type="checkbox" id="filterSignal" checked> Filtrar Ruido
+                            <input type="checkbox" id="filterSignal" checked> Butterworth
+                        </label>
+                        <label class="control-checkbox">
+                            <input type="checkbox" id="nlmsSignal" checked> Filtro NLMS
                         </label>
                     </div>
                 </div>
@@ -124,11 +141,56 @@
         </div>
     </section>
 
+    <!-- Modal de Calibración Clínica Individual -->
+    <div id="calibModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-content">
+            <h3 style="color: #621132; margin-top: 0;">⚖️ Calibración Clínica Individual</h3>
+            <p style="font-size: 12px; color: #4e232e;">
+                Ingrese 3 mediciones previas tomadas con esfigmomanómetro clínico para eliminar el truncamiento rígido y calibrar de forma personalizada la presión arterial estimada:
+            </p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                <div>
+                    <label style="font-size: 11px; font-weight: bold;">ID Sujeto:</label>
+                    <input type="text" id="calibSubjectId" value="SUJETO-01" class="input-number" style="width: 100%;">
+                </div>
+                <div></div>
+                <div>
+                    <label style="font-size: 11px;">Sistólica 1 (mmHg):</label>
+                    <input type="number" id="calibS1" value="120" class="input-number" style="width: 100%;">
+                </div>
+                <div>
+                    <label style="font-size: 11px;">Diastólica 1 (mmHg):</label>
+                    <input type="number" id="calibD1" value="80" class="input-number" style="width: 100%;">
+                </div>
+                <div>
+                    <label style="font-size: 11px;">Sistólica 2 (mmHg):</label>
+                    <input type="number" id="calibS2" value="120" class="input-number" style="width: 100%;">
+                </div>
+                <div>
+                    <label style="font-size: 11px;">Diastólica 2 (mmHg):</label>
+                    <input type="number" id="calibD2" value="80" class="input-number" style="width: 100%;">
+                </div>
+                <div>
+                    <label style="font-size: 11px;">Sistólica 3 (mmHg):</label>
+                    <input type="number" id="calibS3" value="120" class="input-number" style="width: 100%;">
+                </div>
+                <div>
+                    <label style="font-size: 11px;">Diastólica 3 (mmHg):</label>
+                    <input type="number" id="calibD3" value="80" class="input-number" style="width: 100%;">
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button id="saveCalibBtn" class="btn btn-primary" style="font-size: 11px;">Guardar y Aplicar</button>
+                <button id="closeCalibBtn" class="btn btn-secondary" style="font-size: 11px;">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Tarjetas de Diagnósticos -->
     <section id="diagnosticos" class="vitals-section">
         <div class="section-header">
-            <h2>Módulos de Análisis Cardiovascular</h2>
-            <p>Algoritmos avanzados desarrollados para la estimación de variables clínicas a partir de la señal PPG de reflectancia.</p>
+            <h2>Módulos de Análisis Cardiovascular (v2.0)</h2>
+            <p>Algoritmos avanzados desarrollados para la estimación de variables clínicas a partir de la señal PPG de reflectancia con supresión de ruido por acelerometría.</p>
         </div>
         <div class="vitals-grid">
             <div class="vital-card">
@@ -138,7 +200,7 @@
                     <span id="bpmValue" class="vital-number">--</span>
                     <span class="vital-unit">BPM</span>
                 </div>
-                <p>Calculado utilizando un suavizado adaptativo de la señal infrarroja (paso bajo de 200ms) y extracción de mediana de intervalos RR. Altamente resistente a ruidos e interferencias de la muesca dícrita.</p>
+                <p>Calculado utilizando un suavizado adaptativo de la señal infrarroja post-NLMS y mediana de intervalos RR. Altamente resistente a artefactos mecánicos y muesca dícrota.</p>
             </div>
             <div class="vital-card">
                 <div class="card-icon bp">📊</div>
@@ -147,7 +209,7 @@
                     <span id="bpValue" class="vital-number">-- / --</span>
                     <span class="vital-unit">mmHg</span>
                 </div>
-                <p>Algoritmo de análisis de onda de pulso (PWA) que mide el tiempo de sístole (subida) y diástole (bajada) en milisegundos de cada latido, estimando valores sistólicos/diastólicos de presión arterial.</p>
+                <p>Análisis de onda de pulso (PWA) con calibración clínica personalizada por esfigmomanómetro. Sin truncamiento rígido artificial y con retención inteligente ante movimiento fuerte.</p>
             </div>
             <div class="vital-card">
                 <div class="card-icon spo2">📶</div>
@@ -156,216 +218,290 @@
                     <span id="spo2Value" class="vital-number">--</span>
                     <span class="vital-unit">% SpO₂</span>
                 </div>
-                <p>Establece la relación de atenuación luminosa entre los LEDs rojo e infrarrojo del MAX30102. Aplica el cálculo de amplitudes CA/CC y la curva de regresión estándar de saturación de oxígeno.</p>
+                <p>Relación de atenuación espectral CA/CC entre luz Roja e Infrarroja, compensada automáticamente según el nivel de melanina dérmica detectado por la razón continua $DC_{raw}$.</p>
             </div>
         </div>
     </section>
 
-    <!-- Guía de Hardware y Conexiones -->
+    <!-- Guía de Hardware y Conexiones Versión 2.0 -->
     <section id="hardware" class="hardware-section">
         <div class="section-header">
-            <h2>Ensamblaje del Hardware (Formato Pulsera)</h2>
-            <p>Especificaciones de conexión física y ensamble entre el sensor óptico y el microcontrolador ESP32.</p>
+            <h2>Arquitectura Eléctrica y Hardware Autónomo (Versión 2.0)</h2>
+            <p>Alimentación independiente mediante batería Li-Po de 3.7V, gestión de carga TP4056 USB-C, filtrado LDO y acelerometría MPU6050.</p>
         </div>
         <div class="hardware-container">
             <div class="hardware-diagram">
-                <h3>Esquema del Circuito (I2C)</h3>
-                <img src="wiring.png" alt="Diagrama de Conexiones ESP32 y MAX30102" class="wiring-img">
+                <h3>Esquema de Conexiones (I2C + Energía)</h3>
+                <img src="wiring.png" alt="Diagrama de Conexiones ESP32 Mini, MAX30102 y MPU6050" class="wiring-img">
             </div>
             <div class="hardware-instructions">
-                <h3>Directrices de Conexión y Uso</h3>
+                <h3>Mejoras de Hardware Implementadas</h3>
                 <ul class="steps-list">
                     <li>
-                        <strong>Alimentación Segura:</strong> Conecta el pin <strong>VCC</strong> del MAX30102 exclusivamente al pin <strong>3V3</strong> de tu ESP32. Alimentarlo a 5V/VIN dañará permanentemente el sensor.
+                        <strong>Fuente de Alimentación Li-Po 3.7V:</strong> Se elimina la dependencia del cable USB para energizar el dispositivo. El puerto USB queda destinado únicamente a la recarga de la batería y programación.
                     </li>
                     <li>
-                        <strong>Bus de Datos I2C:</strong> Utiliza cables cortos (10-15 cm) para conectar SDA a GPIO 21 y SCL a GPIO 22 en placas ESP32 estándar. Soldar los cables es altamente recomendable para uso portátil.
+                        <strong>Módulo TP4056 con Protección:</strong> Controla el ciclo de carga CC/CV de la batería Li-Po y corta la descarga si baja de niveles críticos.
                     </li>
                     <li>
-                        <strong>Ubicación de la Pulsera:</strong> Monta el sensor MAX30102 en la <strong>cara interna de la muñeca</strong> (sobre la arteria radial) y la placa ESP32 con la batería en la cara externa de la muñeca.
+                        <strong>Regulador LDO Interno ESP32 Mini:</strong> La salida del TP4056 se conecta al pin VIN/5V. El regulador LDO integrado estabiliza la tensión a 3.3V limpios para los sensores, descartando el LM2596 por ser incompatible (step-down).
                     </li>
                     <li>
-                        <strong>Medición en Reposo:</strong> Mantén tu brazo apoyado sobre una superficie plana y permanece completamente quieto durante los 10 segundos del estudio para evitar artefactos por movimiento.
+                        <strong>Acelerómetro MPU6050:</strong> Conectado en el mismo bus I2C (400 kHz) a 3.3V, montado junto al MAX30102 en la muñeca para sensar aceleración triaxial (±2g).
+                    </li>
+                    <li>
+                        <strong>Monitoreo de Batería (ADC1):</strong> Divisor de tensión con 2 resistencias de 100 kΩ conectado a GPIO 34. Permite leer el voltaje con histéresis clínica (<3.4V alerta, ≥3.5V reposición).
                     </li>
                 </ul>
             </div>
         </div>
     </section>
 
-    <!-- Código de Programación de Arduino -->
+    <!-- Código de Programación de Arduino v2.0 -->
     <section id="codigo" class="code-section">
         <div class="section-header">
-            <h2>Firmware de Arduino para el ESP32</h2>
-            <p>Carga este código en tu placa ESP32 usando Arduino IDE para habilitar la transmisión de datos a la computadora.</p>
+            <h2>Firmware Versión 2.0 para ESP32 Mini (C++)</h2>
+            <p>Código fuente completo con soporte MPU6050, trama extendida de 20 bytes, característica GATT de batería y reconexión automática.</p>
         </div>
         <div class="code-container">
             <div class="code-header">
-                <span>sketch_tensiometro.ino</span>
+                <span>firmware_v2.ino (ESP32 Mini)</span>
                 <button id="copyBtn" class="btn btn-copy">📋 Copiar Código</button>
             </div>
-            <pre><code id="arduinoCode">#include &lt;Wire.h&gt;
-#include "MAX30105.h" // Librería SparkFun MAX3010x (funciona para el MAX30102)
+            <pre><code id="arduinoCode">/*
+  ===================================================================================
+  ESTACIÓN MÉDICA DE DIAGNÓSTICO CARDIOVASCULAR - VERSIÓN 2.0
+  Proyecto: Tensiómetro Digital de Arteria Radial con Compensación y Cancelación NLMS
+  Plataforma: ESP32 Mini (Operación Autónoma a Batería Li-Po 3.7V con TP4056 USB-C)
+  Sensores: MAX30102 (PPG Óptico) + MPU6050 (Acelerómetro Triaxial) en Bus I2C (400kHz)
+  ===================================================================================
+*/
+
+#include &lt;Wire.h&gt;
+#include "MAX30105.h"
 #include &lt;BLEDevice.h&gt;
 #include &lt;BLEServer.h&gt;
 #include &lt;BLEUtils.h&gt;
 #include &lt;BLE2902.h&gt;
 
-MAX30105 particleSensor;
-
-// UUIDs de Bluetooth (Deben coincidir con la aplicación de la PC)
+// UUIDs del Servicio de Diagnóstico y Características
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-#define CHAR_UUID           "beb5483e-36e1-4688-b7f5-ea07361b26a8" // Notificaciones
-#define CONTROL_UUID        "12345678-1234-1234-1234-123456789abc" // Comandos START/STOP
+#define DATA_CHAR_UUID      "beb5483e-36e1-4688-b7f5-ea07361b26a8" // Notificaciones 20 bytes
+#define CONTROL_CHAR_UUID   "12345678-1234-1234-1234-123456789abc" // Control START/STOP
+#define BATTERY_CHAR_UUID   "00002a19-0000-1000-8000-00805f9b34fb" // Característica Batería
 
+// Direcciones I2C y Registros MPU6050
+#define MPU6050_ADDR        0x68
+#define MPU_PWR_MGMT_1      0x6B
+#define MPU_ACCEL_CONFIG    0x1C
+#define MPU_ACCEL_XOUT_H    0x3B
+
+// Monitoreo de Batería (ADC1)
+#define BATTERY_ADC_PIN     34    // Entrada ADC1 (Divisor resistivo 100k + 100k = factor 2.0)
+#define ADC_REF_VOLTAGE     3.3
+#define ADC_RESOLUTION      4095.0
+#define V_DIVIDER_RATIO     2.0
+#define V_BAT_CRITICAL      3.40  // Alerta si < 3.4V
+#define V_BAT_HYSTERESIS    3.50  // Apagado de alerta a 3.5V
+
+MAX30105 particleSensor;
 BLEServer* pServer = NULL;
 BLECharacteristic* pDataChar = NULL;
 BLECharacteristic* pControlChar = NULL;
+BLECharacteristic* pBatteryChar = NULL;
+
 bool deviceConnected = false;
 bool streamingActive = false;
 uint16_t packetSequence = 0;
 
-// Variables para acumular las muestras de doble canal
 #define SAMPLE_PAIRS_PER_PACKET 2
 uint32_t redBuffer[SAMPLE_PAIRS_PER_PACKET];
 uint32_t irBuffer[SAMPLE_PAIRS_PER_PACKET];
 uint8_t bufferIndex = 0;
 
-// Callbacks para detectar conexión y desconexión de la PC
-class MyServerCallbacks: public BLEServerCallbacks {
+int16_t accelX = 0, accelY = 0, accelZ = 16384;
+unsigned long lastBatteryCheck = 0;
+bool lowBatteryActive = false;
+uint8_t batteryPct = 100;
+uint16_t batteryMv = 4200;
+
+bool initMPU6050() {
+    Wire.beginTransmission(MPU6050_ADDR);
+    Wire.write(MPU_PWR_MGMT_1);
+    Wire.write(0x00);
+    if (Wire.endTransmission() != 0) return false;
+
+    Wire.beginTransmission(MPU6050_ADDR);
+    Wire.write(MPU_ACCEL_CONFIG);
+    Wire.write(0x00); // ±2g
+    return (Wire.endTransmission() == 0);
+}
+
+void readMPU6050Accel() {
+    Wire.beginTransmission(MPU6050_ADDR);
+    Wire.write(MPU_ACCEL_XOUT_H);
+    Wire.endTransmission(false);
+    Wire.requestFrom((uint8_t)MPU6050_ADDR, (size_t)6, true);
+    if (Wire.available() &gt;= 6) {
+        accelX = (Wire.read() &lt;&lt; 8) | Wire.read();
+        accelY = (Wire.read() &lt;&lt; 8) | Wire.read();
+        accelZ = (Wire.read() &lt;&lt; 8) | Wire.read();
+    }
+}
+
+void checkBatteryStatus() {
+    uint32_t adcSum = 0;
+    for (int k = 0; k &lt; 8; k++) {
+        adcSum += analogRead(BATTERY_ADC_PIN);
+        delayMicroseconds(50);
+    }
+    float rawAdc = (float)adcSum / 8.0f;
+    float voltage = (rawAdc / ADC_RESOLUTION) * ADC_REF_VOLTAGE * V_DIVIDER_RATIO;
+    batteryMv = (uint16_t)(voltage * 1000.0f);
+
+    int pct = (int)(((voltage - V_BAT_CRITICAL) / (4.20f - V_BAT_CRITICAL)) * 100.0f);
+    batteryPct = (uint8_t)constrain(pct, 0, 100);
+
+    if (voltage &lt; V_BAT_CRITICAL) lowBatteryActive = true;
+    else if (voltage &gt;= V_BAT_HYSTERESIS) lowBatteryActive = false;
+
+    uint8_t flags = 0;
+    if (deviceConnected) flags |= 0x01;
+    if (lowBatteryActive) flags |= 0x02;
+
+    if (deviceConnected && pBatteryChar != NULL) {
+        uint8_t batPayload[4] = { batteryPct, (uint8_t)(batteryMv & 0xFF), (uint8_t)((batteryMv &gt;&gt; 8) & 0xFF), flags };
+        pBatteryChar-&gt;setValue(batPayload, 4);
+        pBatteryChar-&gt;notify();
+    }
+}
+
+class ServerCallbacksV2: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
-      deviceConnected = true;
-    };
+        deviceConnected = true;
+        Serial.println("[BLE v2] Enlace establecido.");
+    }
     void onDisconnect(BLEServer* pServer) {
-      deviceConnected = false;
-      streamingActive = false;
-      packetSequence = 0;
-      bufferIndex = 0;
-      pServer->startAdvertising(); // Reiniciar anuncios para permitir reconexión
+        deviceConnected = false;
+        streamingActive = false;
+        packetSequence = 0;
+        bufferIndex = 0;
+        Serial.println("[BLE v2] Desconexión. Reiniciando anuncios...");
+        pServer-&gt;startAdvertising(); // Reconexión automática
     }
 };
 
-// Callbacks para recibir los comandos de START o STOP desde la PC (Corregido para compatibilidad)
-class ControlCallbacks: public BLECharacteristicCallbacks {
+class ControlCallbacksV2: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
-      String rxValue = pCharacteristic->getValue().c_str(); 
-      if (rxValue.length() > 0) {
+        String rxValue = pCharacteristic-&gt;getValue().c_str(); 
         if (rxValue == "START") {
-          streamingActive = true;
-          packetSequence = 0;
-          bufferIndex = 0;
+            streamingActive = true;
+            packetSequence = 0;
+            bufferIndex = 0;
+            particleSensor.clearFIFO();
         } else if (rxValue == "STOP") {
-          streamingActive = false;
+            streamingActive = false;
         }
-      }
     }
 };
 
 void setup() {
-  Serial.begin(115200);
+    Serial.begin(115200);
+    analogReadResolution(12);
+    pinMode(BATTERY_ADC_PIN, INPUT);
 
-  // 1. Inicializar sensor MAX30102 por bus I2C
-  if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) {
-    Serial.println("¡Sensor MAX30102 no encontrado! Revisa las conexiones.");
-    while (1);
-  }
+    Wire.begin(21, 22, 400000);
+    initMPU6050();
 
-  // Configuración del sensor para la muñeca (SpO2 / Multi-LED)
-  byte ledBrightness = 60; // 0 (apagado) a 255 (máximo). 60 es óptimo para la muñeca.
-  byte sampleAverage = 1;  // 1 = sin promediar (100 Hz puros)
-  byte ledMode = 2;        // 2 = LED Rojo + LED Infrarrojo (modo SpO2)
-  int sampleRate = 100;    // Frecuencia: 100 muestras por segundo (Hz)
-  int pulseWidth = 411;    // Ancho de pulso del LED en microsegundos
-  int adcRange = 4096;     // Rango del conversor ADC (4096 nA)
+    if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) {
+        while (1) delay(1000);
+    }
 
-  particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange);
+    particleSensor.setup(60, 1, 2, 100, 411, 4096);
+    particleSensor.clearFIFO();
 
-  // 2. Inicializar Bluetooth de bajo consumo (BLE)
-  BLEDevice::init("Tensiometro_Pulsera"); // Nombre del dispositivo
-  pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
+    BLEDevice::init("Tensiometro_Pulsera_v2");
+    pServer = BLEDevice::createServer();
+    pServer-&gt;setCallbacks(new ServerCallbacksV2());
 
-  BLEService *pService = pServer->createService(SERVICE_UUID);
+    BLEService *pService = pServer-&gt;createService(SERVICE_UUID);
 
-  // Característica de datos (Notificación)
-  pDataChar = pService->createCharacteristic(
-                CHAR_UUID,
-                BLECharacteristic::PROPERTY_NOTIFY
-              );
-  pDataChar->addDescriptor(new BLE2902());
+    pDataChar = pService-&gt;createCharacteristic(DATA_CHAR_UUID, BLECharacteristic::PROPERTY_NOTIFY);
+    pDataChar-&gt;addDescriptor(new BLE2902());
 
-  // Característica de control (Escritura desde la PC)
-  pControlChar = pService->createCharacteristic(
-                   CONTROL_UUID,
-                   BLECharacteristic::PROPERTY_WRITE
-                 );
-  pControlChar->setCallbacks(new ControlCallbacks());
+    pControlChar = pService-&gt;createCharacteristic(CONTROL_UUID, BLECharacteristic::PROPERTY_WRITE);
+    pControlChar-&gt;setCallbacks(new ControlCallbacksV2());
 
-  pService->start();
+    pBatteryChar = pService-&gt;createCharacteristic(BATTERY_CHAR_UUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+    pBatteryChar-&gt;addDescriptor(new BLE2902());
 
-  // Iniciar transmisiones de anuncio BLE
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(true);
-  pAdvertising->setMinPreferred(0x06);  
-  pAdvertising->setMinPreferred(0x12);
-  BLEDevice::startAdvertising();
+    pService-&gt;start();
 
-  Serial.println("Pulsera BLE lista. Esperando vinculacion con la PC...");
+    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising-&gt;addServiceUUID(SERVICE_UUID);
+    pAdvertising-&gt;setScanResponse(true);
+    pAdvertising-&gt;setMinPreferred(0x06);
+    pAdvertising-&gt;setMinPreferred(0x12);
+    BLEDevice::startAdvertising();
+
+    checkBatteryStatus();
 }
 
 void loop() {
-  if (deviceConnected && streamingActive) {
-    
-    particleSensor.check(); // Lee el buffer FIFO del sensor por I2C
-
-    // Si el sensor tiene muestras listas en su memoria interna
-    while (particleSensor.available()) {
-      redBuffer[bufferIndex] = particleSensor.getRed();
-      irBuffer[bufferIndex] = particleSensor.getIR();
-      
-      particleSensor.nextSample(); // Avanzar al siguiente dato en el chip
-      bufferIndex++;
-
-      // Al juntar 2 muestras de ambos canales (12 bytes de datos) los enviamos
-      if (bufferIndex >= SAMPLE_PAIRS_PER_PACKET) {
-        uint8_t payload[14];
-
-        // Muestra 1: Rojo (3 bytes, Big Endian)
-        payload[0] = (redBuffer[0] >> 16) & 0xFF;
-        payload[1] = (redBuffer[0] >> 8) & 0xFF;
-        payload[2] = redBuffer[0] & 0xFF;
-
-        // Muestra 1: Infrarrojo (3 bytes, Big Endian)
-        payload[3] = (irBuffer[0] >> 16) & 0xFF;
-        payload[4] = (irBuffer[0] >> 8) & 0xFF;
-        payload[5] = irBuffer[0] & 0xFF;
-
-        // Muestra 2: Rojo (3 bytes, Big Endian)
-        payload[6] = (redBuffer[1] >> 16) & 0xFF;
-        payload[7] = (redBuffer[1] >> 8) & 0xFF;
-        payload[8] = redBuffer[1] & 0xFF;
-
-        // Muestra 2: Infrarrojo (3 bytes, Big Endian)
-        payload[9] = (irBuffer[1] >> 16) & 0xFF;
-        payload[10] = (irBuffer[1] >> 8) & 0xFF;
-        payload[11] = irBuffer[1] & 0xFF;
-
-        // Secuencia del paquete (2 bytes, Little Endian)
-        payload[12] = packetSequence & 0xFF;
-        payload[13] = (packetSequence >> 8) & 0xFF;
-
-        // Enviar notificación a la computadora
-        pDataChar->setValue(payload, 14);
-        pDataChar->notify();
-
-        packetSequence++;
-        bufferIndex = 0; // Limpiar buffer para las siguientes muestras
-      }
+    if (millis() - lastBatteryCheck &gt;= 2000) {
+        lastBatteryCheck = millis();
+        checkBatteryStatus();
     }
-  }
-  
-  // Breve retraso para estabilidad del bucle
-  delay(1);
+
+    if (deviceConnected && streamingActive) {
+        particleSensor.check();
+
+        while (particleSensor.available()) {
+            redBuffer[bufferIndex] = particleSensor.getRed();
+            irBuffer[bufferIndex] = particleSensor.getIR();
+            particleSensor.nextSample();
+            bufferIndex++;
+
+            if (bufferIndex &gt;= SAMPLE_PAIRS_PER_PACKET) {
+                readMPU6050Accel();
+
+                // Trama extendida de 20 bytes
+                uint8_t payload[20];
+                payload[0] = (redBuffer[0] &gt;&gt; 16) & 0xFF;
+                payload[1] = (redBuffer[0] &gt;&gt; 8) & 0xFF;
+                payload[2] = redBuffer[0] & 0xFF;
+
+                payload[3] = (irBuffer[0] &gt;&gt; 16) & 0xFF;
+                payload[4] = (irBuffer[0] &gt;&gt; 8) & 0xFF;
+                payload[5] = irBuffer[0] & 0xFF;
+
+                payload[6] = (redBuffer[1] &gt;&gt; 16) & 0xFF;
+                payload[7] = (redBuffer[1] &gt;&gt; 8) & 0xFF;
+                payload[8] = redBuffer[1] & 0xFF;
+
+                payload[9] = (irBuffer[1] &gt;&gt; 16) & 0xFF;
+                payload[10] = (irBuffer[1] &gt;&gt; 8) & 0xFF;
+                payload[11] = irBuffer[1] & 0xFF;
+
+                payload[12] = packetSequence & 0xFF;
+                payload[13] = (packetSequence &gt;&gt; 8) & 0xFF;
+
+                payload[14] = accelX & 0xFF;
+                payload[15] = (accelX &gt;&gt; 8) & 0xFF;
+                payload[16] = accelY & 0xFF;
+                payload[17] = (accelY &gt;&gt; 8) & 0xFF;
+                payload[18] = accelZ & 0xFF;
+                payload[19] = (accelZ &gt;&gt; 8) & 0xFF;
+
+                pDataChar-&gt;setValue(payload, 20);
+                pDataChar-&gt;notify();
+
+                packetSequence++;
+                bufferIndex = 0;
+            }
+        }
+    }
+    delay(1);
 }</code></pre>
         </div>
     </section>
@@ -374,7 +510,7 @@ void loop() {
     <footer class="main-footer">
         <div class="footer-container">
             <p>🇲🇽 Secretaría de Salud - Gobierno de México. Desarrollado con fines de investigación de diagnóstico digital no invasivo.</p>
-            <p class="copyright">&copy; 2026 - Proyecto de Estación Médica de Monitoreo Cardiovascular.</p>
+            <p class="copyright">&copy; 2026 - Proyecto de Estación Médica de Monitoreo Cardiovascular v2.0.</p>
         </div>
     </footer>
 

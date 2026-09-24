@@ -19,9 +19,10 @@ __pycache__/
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
-# Scripts temporales de prueba
+# Scripts temporales de prueba y backups
 test_filter.py
 test_color.py
+*_backup.py
 
 # DATASETS PESADOS (Ignorados para evitar que GitHub rechace el push por limite de 100MB)
 Baumanometro/Baumanometro/dataset/
