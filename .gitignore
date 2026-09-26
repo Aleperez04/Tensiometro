@@ -39,6 +39,7 @@ pyinstxtractor.py
 test_*.py
 test_shot.png
 build_manual_*.py
+build_pulsera_*.py
 user_manual_img/
 temp_*.html
 
