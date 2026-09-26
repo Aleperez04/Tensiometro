@@ -1,0 +1,187 @@
+===================================================================================
+                   ESTACIÓN MÉDICA DE DIAGNÓSTICO CARDIOVASCULAR
+                 TENSIÓMETRO DIGITAL PORTÁTIL DE ARTERIA RADIAL
+                       ESPECIFICACIONES Y REQUERIMIENTOS DEL SISTEMA
+===================================================================================
+Institución: Instituto Tecnológico Superior del Occidente del Estado de Hidalgo (ITSOEH)
+División:    Ingeniería en Sistemas Computacionales
+Proyecto:    Monitor Continuo No Invasivo de Signos Vitales (BPM, SBP, DBP, SpO2)
+Desarrollo:  Alejandro Pérez (8.° Semestre — Grupo A)
+Fecha:       Septiembre 2026
+===================================================================================
+
+Este documento detalla los requerimientos mínimos y recomendados de hardware,
+arquitectura de procesamiento, memoria, almacenamiento y compatibilidad de 
+sistemas operativos (Windows e iOS) para la operación de la aplicación de escritorio 
+y la pulsera médica inteligente.
+
+-----------------------------------------------------------------------------------
+1. TABLA RESUMEN DE REQUERIMIENTOS DE HARDWARE (COMPUTADORA / PC)
+-----------------------------------------------------------------------------------
+
+Componente             Requisito Mínimo                   Requisito Recomendado
+-----------------------------------------------------------------------------------
+Procesador (CPU)       Intel Core i3 (4.ª Gen) /          Intel Core i5 / i7 (8.ª Gen+)
+                       AMD Ryzen 3 a 2.0 GHz              AMD Ryzen 5 / 7 a 2.8 GHz+
+Arquitectura CPU       x86_64 (64 bits)                   x86_64 (64 bits)
+                       Soporte para instrucciones SSE2    Soporte AVX2 / FMA
+Memoria RAM            4 GB RAM DDR3                      8 GB RAM DDR4 / DDR5
+Almacenamiento Libre   1 GB de espacio disponible         5 GB de espacio disponible
+Tipo de Disco          Disco Duro Mecánico (HDD SATA)     Unidad de Estado Sólido (SSD NVMe)
+Pantalla / Resolución  1366 × 768 píxeles (WXGA)          1920 × 1080 píxeles (Full HD)
+Adaptador Bluetooth    Bluetooth 4.2 Low Energy (BLE)     Bluetooth 5.0 / 5.2 / 5.3 BLE
+                       (Integrado o Dongle USB)           (Baja latencia, alcance > 10 m)
+Puertos Físicos        1 Puerto USB 2.0 disponible        1 Puerto USB 3.0 / USB-C
+                       (Para carga de batería TP4056)     (Para carga y telemetría opcional)
+Dispositivo de Entrada Ratón (Mouse) y Teclado            Pantalla táctil o Touchpad + Ratón
+
+-----------------------------------------------------------------------------------
+2. REQUERIMIENTOS DETALLADOS DE PROCESAMIENTO Y MEMORIA
+-----------------------------------------------------------------------------------
+
+2.1 Procesador (CPU)
+* ¿Se necesita un procesador en específico?
+  No se requiere una marca o modelo exclusivo, pero sí debe cumplir con las 
+  siguientes condiciones técnicas:
+  - Arquitectura obligatoria: 64 bits (x86-64 / AMD64). Los procesadores antiguos de 
+    32 bits (x86) no son compatibles con las librerías modernas de cálculo (NumPy, 
+    PyQt6).
+  - Frecuencia de Reloj: Mínimo 2.0 GHz en al menos 2 núcleos físicos (Dual-Core). 
+    Recomendado 4 núcleos (Quad-Core) a 2.5 GHz o superior.
+  - Carga computacional: La aplicación ejecuta en paralelo:
+    1) Recepción asíncrona BLE a 100 Hz (paquetes de 20 bytes cada 20 ms).
+    2) Filtrado IIR Butterworth de 4.° orden en Secciones de Segundo Orden (SOS).
+    3) Filtro adaptativo NLMS (24 coeficientes a fs=100 Hz con producto punto vectorial).
+    4) Renderizado dinámico del osciloscopio en Matplotlib a 30 cuadros por segundo (FPS).
+    Cualquier procesador Intel Core i3/i5/i7 o AMD Ryzen de los últimos 8 años ejecuta 
+    estas tareas con un uso de CPU inferior al 8%.
+
+2.2 Memoria RAM
+* Mínimo absoluto: 4 GB de memoria RAM.
+  - El ejecutable autónomo (`tensiometro_reconstructed.exe`) y su entorno en memoria 
+    consumen aproximadamente entre 180 MB y 260 MB durante la ejecución en reposo.
+  - Con un búfer deslizante continuo de 800 muestras por canal (8 segundos) y 
+    grabación extendida de 30 variables clínicas, el consumo de memoria se mantiene 
+    altamente optimizado y estable sin fugas de memoria (Memory Leaks).
+* Recomendado: 8 GB o más. Permite operar el sistema cardiovascular en paralelo con 
+  expedientes clínicos electrónicos, navegadores o paquetería de oficina sin ralentización.
+
+2.3 Memoria de Almacenamiento (Disco)
+* Espacio del software:
+  - Archivo ejecutable (.exe): ~125 MB (empaqueta el motor de Python, Qt6, librerías 
+    gráficas y matemáticas).
+  - Documentación técnica y manuales PDF: ~6 MB.
+* Espacio para reportes clínicos y datos (CSV):
+  - Cada sesión de monitoreo de 1 minuto genera un archivo CSV de aproximadamente 
+    150 KB a 200 KB (con 6,000 filas y 20 columnas numéricas).
+  - Una cohorte de prueba de 30 pacientes (sesiones de 5 minutos cada uno) requiere 
+    menos de 35 MB de espacio en disco.
+  - Con 1 GB libre se pueden almacenar más de 5,000 estudios clínicos completos.
+
+-----------------------------------------------------------------------------------
+3. COMPATIBILIDAD CON SISTEMAS OPERATIVOS WINDOWS
+-----------------------------------------------------------------------------------
+
+Versión de Windows     Compatibilidad   Detalles y Consideraciones Técnicas
+-----------------------------------------------------------------------------------
+Windows 11             100% COMPATIBLE  • Soporte nativo óptimo.
+(64 bits)              (Recomendado)    • API WinRT Bluetooth Low Energy 100% integrada.
+                                        • Compatibilidad plena con interfaz PyQt6.
+                                        • Reconexión y emparejamiento BLE automático.
+
+Windows 10             100% COMPATIBLE  • Totalmente compatible a partir de la versión 
+(64 bits)              (Recomendado)      1809 (Build 17763) en adelante.
+                                        • Pila de controladores Bluetooth GATT nativa.
+                                        • Rendimiento idéntico a Windows 11.
+
+Windows 8 / 8.1        NO COMPATIBLE    • La librería de conectividad BLE (`bleak`) y 
+(64 bits)                                 el framework gráfico PyQt6 han descontinuado 
+                                          el soporte oficial para Windows 8.x.
+                                        • Carece de las extensiones modernas de WinRT.
+
+Windows 7              NO COMPATIBLE    • Windows 7 NO cuenta con soporte nativo para 
+(32 y 64 bits)                            Bluetooth Low Energy (GATT / BLE Server).
+                                        • Microsoft finalizó el soporte técnico en 2020.
+                                        • Python 3.9+ y PyQt6 no pueden ejecutarse en 
+                                          Windows 7 (error por falta de DLLs de sistema: 
+                                          `api-ms-win-core-path-l1-1-0.dll`).
+
+-----------------------------------------------------------------------------------
+4. COMPATIBILIDAD CON APPLE iOS (iPHONE / iPAD)
+-----------------------------------------------------------------------------------
+
+¿Es funcional para iOS? ¿Qué versiones aguanta?
+
+Es fundamental distinguir entre la APLICACIÓN DE ESCRITORIO y la PULSERA FÍSICA:
+
+4.1 Aplicación de Escritorio (.exe / PyQt6) en iOS:
+* La aplicación actual es un programa binario compilado específicamente para 
+  arquitectura de computadoras personales (Windows x86_64).
+* Por diseño de Apple, los dispositivos móviles iPhone y iPad ejecutan el sistema 
+  operativo iOS / iPadOS sobre procesadores de arquitectura ARM (Apple Silicon A-Series/
+  M-Series). iOS tiene un entorno cerrado ("Sandbox") que NO permite ejecutar archivos 
+  `.exe` de Windows ni programas directos de Python/Qt de escritorio.
+* Por lo tanto, el archivo `.exe` NO se puede instalar ni abrir directamente en un 
+  iPhone o iPad.
+
+4.2 Compatibilidad del Hardware de la Pulsera Médica (ESP32 Mini) con iOS:
+* ¡EL HARDWARE Y SU PROTOCOLO SÍ SON 100% COMPATIBLES CON iOS!
+* La pulsera utiliza el estándar universal Bluetooth Low Energy (BLE GATT Profile).
+* Cualquier iPhone o iPad que soporte Bluetooth 4.2 o superior puede vincularse y 
+  recibir la telemetría médica de 20 bytes a 100 Hz.
+* Versiones de iOS compatibles con la pulsera:
+  - Compatible desde: iOS 11.0 en adelante.
+  - Versión recomendada: iOS 13.0, iOS 14.0, iOS 15.0, iOS 16.0, iOS 17.0 e iOS 18.0+.
+  - Dispositivos Apple soportados por hardware:
+    * iPhone 6s, 7, 8, SE, X, XR, XS, 11, 12, 13, 14, 15, 16 (y variantes Pro/Max).
+    * iPad Air (3.ª gen en adelante), iPad Mini (5.ª gen+), iPad (6.ª gen+), iPad Pro.
+* ¿Cómo interactuar con la pulsera desde iOS hoy en día?
+  1) Aplicaciones de auditoría BLE estándar en la App Store (gratuitas):
+     - "nRF Connect for Mobile" (Nordic Semiconductor).
+     - "LightBlue" (Punch Through).
+     Al abrir estas apps en un iPhone con iOS 11+, se detecta el dispositivo 
+     `Tensiometro_Pulsera`, se conecta al UUID `4fafc201-1fb5-459e-8fcc-c5c9c331914b`, 
+     se escribe el comando `"START"` y el iPhone recibe en tiempo real las tramas de 
+     20 bytes con el pulso y la batería.
+  2) Desarrollo de App Móvil Nativa (Futuro desarrollo):
+     Para tener la interfaz gráfica médica idéntica en iPhone, se debe compilar una 
+     app nativa en Swift (usando el framework `CoreBluetooth`) o en Flutter/React Native, 
+     compatible con iOS 14.0 o superior.
+
+4.3 ¿Qué ocurre con la Web (Safari en iOS)?
+* Apple bloquea por defecto la API Web Bluetooth en el navegador Safari de iOS por 
+  políticas internas de privacidad.
+* Para conectar la pulsera desde la web en iOS se requiere utilizar navegadores 
+  especializados de la App Store que habilitan Web Bluetooth, tales como "Bluefy" o 
+  "WebBLE" (compatibles con iOS 12.0+).
+
+-----------------------------------------------------------------------------------
+5. REQUERIMIENTOS DEL HARDWARE EMBEBIDO (PULSERA MÉDICA)
+-----------------------------------------------------------------------------------
+
+Componente             Especificación Técnica
+-----------------------------------------------------------------------------------
+Microcontrolador       ESP32 Mini (Dual-Core Tensilica Xtensa 32-bit LX6 a 240 MHz)
+                       Memoria SRAM: 520 KB | Flash SPI: 4 MB
+Módulo Óptico          MAX30102 (LED Rojo 660 nm + LED Infrarrojo 880 nm)
+                       ADC a 18 bits, I2C a 400 kHz (Dirección 0x57)
+Acelerómetro           MPU6050 (Inercial Triaxial ±2g, 16384 LSB/g, I2C Dirección 0x68)
+Batería Autónoma       Batería Recargable Li-Po de 3.7 V (Capacidad recomendada: 500 mAh)
+                       Autonomía: > 6 horas continuas de telemetría por radio BLE
+Módulo de Carga        TP4056 con conector USB Tipo C
+                       Corriente de carga: 500 mA (con protecciones de sobretensión)
+Divisor de Voltaje     Divisor simétrico 100 kΩ + 100 kΩ (1% tolerancia) en pin GPIO 34 (ADC1)
+Frecuencia de Muestreo 100 Hz reales sincrónicos (1 muestra cada 10 milisegundos)
+Trama de Radio BLE     Trama binaria fija de 20 bytes emitida a 50 Hz (2 muestras/paquete)
+
+===================================================================================
+                                  CONCLUSIÓN
+===================================================================================
+1. Para uso inmediato de la aplicación con osciloscopio: Se requiere una PC o Laptop 
+   con Windows 10 u 11 (64 bits), 4 GB de RAM y Bluetooth 4.2+.
+2. Para Windows 7: No es compatible debido a la ausencia de controladores BLE nativos 
+   y fin de ciclo de vida de librerías.
+3. Para iOS: El software de escritorio (.exe) no corre en iPhone/iPad, pero la pulsera 
+   médica física (ESP32) es 100% compatible con iOS 11.0 o superior a través de 
+   conexión estándar Bluetooth Low Energy (CoreBluetooth).
+===================================================================================
