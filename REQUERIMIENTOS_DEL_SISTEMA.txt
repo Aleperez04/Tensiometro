@@ -107,13 +107,15 @@ Windows 7              NO COMPATIBLE    • Windows 7 NO cuenta con controladore
   mínima latencia y alta eficiencia energética.
 
 4.2 Versiones de macOS Compatibles:
-* macOS 15 Sequoia       --> 100% Compatible (Versión actual más reciente).
-* macOS 14 Sonoma        --> 100% Compatible (Totalmente probado y estable).
-* macOS 13 Ventura       --> 100% Compatible.
-* macOS 12 Monterey      --> 100% Compatible.
-* macOS 11 Big Sur       --> 100% Compatible.
-* macOS 10.15 Catalina   --> Versión MÍNIMA soportada (versiones anteriores a 10.15 
-                             carecen de soporte para PyQt6 y Python moderno).
+* macOS 27 Golden Gate (v27.0) --> 100% Compatible (Versión más reciente de Apple, soporte pleno).
+* macOS Tahoe 26 (v26.7)        --> 100% Compatible (Totalmente probado y estable).
+* macOS 15 Sequoia (v15.x)       --> 100% Compatible.
+* macOS 14 Sonoma (v14.x)        --> 100% Compatible.
+* macOS 13 Ventura (v13.x)       --> 100% Compatible.
+* macOS 12 Monterey (v12.x)      --> 100% Compatible.
+* macOS 11 Big Sur (v11.x)       --> 100% Compatible.
+* macOS 10.15 Catalina           --> Versión MÍNIMA soportada (versiones anteriores a 10.15 
+                                     carecen de soporte para PyQt6 y Python moderno).
 
 4.3 Compatibilidad de Procesadores Apple:
 * Macs con Procesadores Apple Silicon (M1, M2, M3, M4):
@@ -190,9 +192,10 @@ Protocolo de Radio     BLE GATT con paquetes extendidos de 20 bytes a 50 Hz
 1. En Windows: 100% funcional y listo para usarse con doble clic en el ejecutable 
    `tensiometro_reconstructed.exe` en Windows 10 y Windows 11 (64 bits). 
    (Windows 7 no es compatible por falta de controladores BLE nativos).
-2. En Apple Mac (macOS): 100% compatible desde macOS 10.15 Catalina hasta macOS 15 
-   Sequoia (tanto en Macs Intel como en Apple Silicon M1/M2/M3/M4). Se ejecuta vía 
-   Python o compilando el `.app` nativo.
+2. En Apple Mac (macOS): 100% compatible desde macOS 10.15 Catalina hasta las 
+   versiones más recientes como macOS 15 Sequoia, macOS Tahoe 26 (26.7) y 
+   macOS 27 Golden Gate (27.0), tanto en procesadores Intel como en Apple Silicon 
+   M1/M2/M3/M4. Se ejecuta vía Python o compilando el `.app` nativo.
 3. En iPhone/iPad (iOS): La pulsera médica física es 100% compatible desde iOS 11.0+ 
    a través del protocolo estándar Bluetooth Low Energy (CoreBluetooth).
 ===================================================================================
