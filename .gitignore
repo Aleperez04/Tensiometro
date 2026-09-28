@@ -42,6 +42,8 @@ build_manual_*.py
 build_pulsera_*.py
 user_manual_img/
 temp_*.html
+carcasa/
+
 
 # Versiones de prueba y datasets masivos (>100MB)
 firmware_v1/
